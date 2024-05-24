@@ -99,6 +99,20 @@ impl VarianceExt for f64 {
     fn delta(&self, percentage:i32) -> Self { delta::<Self>(self, percentage) }
 }
 
+#[macro_export]
+macro_rules! low {
+    () => {
+        1.d2().lo()
+    }
+}
+
+#[macro_export]
+macro_rules! hi {
+    () => {
+        !low!()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
