@@ -5,27 +5,49 @@ use num::{ Float, Integer, NumCast, ToPrimitive };
  Dice extensions.
  */
 pub trait DiceExt {
-    /// A d2.
+    /**
+     Roll a D2.
+     */
     fn d2(&self) -> Self;
-    /// A d3.
+    /**
+     Roll a D3.
+     */
     fn d3(&self) -> Self;
-    /// A d4.
+    /**
+     Roll a D4.
+     */
     fn d4(&self) -> Self;
-    /// A d5.
+    /**
+     Roll a D5.
+     */
     fn d5(&self) -> Self;
-    /// A d6.
+    /**
+     Roll a D6.
+     */
     fn d6(&self) -> Self;
-    /// A d8.
+    /**
+     Roll a D8.
+     */
     fn d8(&self) -> Self;
-    /// A d10.
+    /**
+     Roll a D10.
+     */
     fn d10(&self) -> Self;
-    /// A d12.
+    /**
+     Roll a D12.
+     */
     fn d12(&self) -> Self;
-    /// A d20.
+    /**
+     Roll a D20.
+     */
     fn d20(&self) -> Self;
-    /// A d100.
+    /**
+     Roll a D100.
+     */
     fn d100(&self) -> Self;
-    /// If chance on `d100` matches `of` then return self, otherwise return None.
+    /**
+     If chance on `d100` matches `of` then return *self*, otherwise return `None`.
+     */
     fn chance(&self, of:i32) -> Option<i32>;
 }
 
@@ -73,16 +95,22 @@ impl HiLo for i32 {
 }
 
 /**
- Value variators.
+ Percentage amount value variator(s).
  */
-pub trait FlatPercentageVariance {
+pub trait PercentageVariance {
     /**
      Take a number and alter it by up to (or less, of course) +/- X%.
     */
     fn delta(&self, percentage:i32) -> Self;
 }
 
+/**
+ Fixed value value variator(s).
+ */
 pub trait FixedNumberVariance<T: Float> {
+    /**
+     Take a number and alter it +/- by \[**0 .. *upto***\], and return result.
+     */
     fn upto_delta(&self, upto:T) -> T;
 }
 
@@ -106,31 +134,30 @@ fn delta_p<T: Float + ToPrimitive>(original: &T, percentage: i32) -> T {
     *original * NumCast::from(1.0 + rand::thread_rng().gen_range(-p..=p)).unwrap()
 }
 
-impl FlatPercentageVariance for f32 {
+impl PercentageVariance for f32 {
     fn delta(&self, percentage:i32) -> Self { delta_p::<Self>(self, percentage) }
 }
 
-impl FlatPercentageVariance for f64 {
+impl PercentageVariance for f64 {
     fn delta(&self, percentage:i32) -> Self { delta_p::<Self>(self, percentage) }
 }
 
 #[macro_export]
-macro_rules! low {
+/**
+ Roll some arbitrary dice and see if their result is "low".
+ */
+macro_rules! lo {
     () => {
         1.d2().lo()
     }
 }
 
 #[macro_export]
+/**
+ Roll some arbitrary dice and see if their result is "high".
+ */
 macro_rules! hi {
     () => {
         !low!()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
     }
 }
