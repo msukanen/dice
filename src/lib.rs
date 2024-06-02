@@ -1,5 +1,5 @@
 use rand::Rng;
-use num::{ Float, Integer, NumCast };
+use num::{ Float, Integer, NumCast, ToPrimitive };
 
 /**
  Dice extensions.
@@ -75,28 +75,37 @@ impl HiLo for i32 {
 /**
  Value variators.
  */
-pub trait VarianceExt {
+pub trait FlatPercentageVariance {
     /**
      Take a number and alter it by up to (or less, of course) +/- X%.
     */
     fn delta(&self, percentage:i32) -> Self;
 }
 
+pub trait FixedNumberVariance<T: Float> {
+    fn upto_delta(&self, upto:T) -> T;
+}
+
+impl FixedNumberVariance<f64> for f64 {
+    fn upto_delta(&self, upto:f64) -> f64 {
+        self + rand::thread_rng().gen_range(-upto..=upto)
+    }
+}
+
 /**
  Take a number and alter it by up to (or less, of course) +/- X%.
  */
-fn delta<T: Float>(original:&T, percentage:i32) -> T {
-    let r = rand::thread_rng().gen_range(0..=(percentage*2)) - percentage;
-    let d = 1.0 + 0.01 * r as f64;
-    *original * NumCast::from(d).unwrap()
+fn delta_p<T: Float + ToPrimitive>(original: &T, percentage: i32) -> T {
+    let p = 0.01 * percentage as f64;
+    *original * NumCast::from(1.0 + rand::thread_rng().gen_range(-p..=p)).unwrap()
 }
 
-impl VarianceExt for f32 {
-    fn delta(&self, percentage:i32) -> Self { delta::<Self>(self, percentage) }
+impl FlatPercentageVariance for f32 {
+    fn delta(&self, percentage:i32) -> Self { delta_p::<Self>(self, percentage) }
 }
 
-impl VarianceExt for f64 {
-    fn delta(&self, percentage:i32) -> Self { delta::<Self>(self, percentage) }
+impl FlatPercentageVariance for f64 {
+    fn delta(&self, percentage:i32) -> Self { delta_p::<Self>(self, percentage) }
 }
 
 #[macro_export]
