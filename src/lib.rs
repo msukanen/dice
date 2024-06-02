@@ -87,7 +87,13 @@ pub trait FixedNumberVariance<T: Float> {
 }
 
 impl FixedNumberVariance<f64> for f64 {
-    fn upto_delta(&self, upto:f64) -> f64 {
+    fn upto_delta(&self, upto:Self) -> Self {
+        self + rand::thread_rng().gen_range(-upto..=upto)
+    }
+}
+
+impl FixedNumberVariance<f32> for f32 {
+    fn upto_delta(&self, upto:Self) -> Self {
         self + rand::thread_rng().gen_range(-upto..=upto)
     }
 }
