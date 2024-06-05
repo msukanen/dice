@@ -161,3 +161,16 @@ macro_rules! hi {
         !low!()
     }
 }
+
+#[cfg(test)]
+mod dice_tests {
+    use crate::DiceExt;
+
+    #[test]
+    fn dice_stay_in_range() {
+        for _ in 0..10_000 {
+            let d = 1.d6();
+            assert!(d >= 1 && d <= 6);
+        }
+    }
+}
