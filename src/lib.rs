@@ -1,3 +1,6 @@
+//!
+//! Dice rolling!
+//! 
 use rand::Rng;
 use num::{ Float, Integer, NumCast, ToPrimitive };
 
