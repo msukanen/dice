@@ -6,6 +6,10 @@ use num::{ Float, Integer, NumCast, ToPrimitive };
  */
 pub trait DiceExt {
     /**
+     Roll any D.
+     */
+    fn d(&self, sides: usize) -> Self;
+    /**
      Roll a D2.
      */
     fn d2(&self) -> Self;
@@ -52,14 +56,20 @@ pub trait DiceExt {
 }
 
 pub trait HiLo {
+    /**
+     Value is considered "high"?
+     */
     fn hi(&self) -> bool;
+    /**
+     Value is considered "low"?
+     */
     fn lo(&self) -> bool;
 }
 
 /**
  Throw given `num` of dice, each with x `sides`.
  */
-fn any_i32(num: i32, sides:u8) -> i32 {
+fn any_i32(num: i32, sides: usize) -> i32 {
     let mut result: i32 = 0;
     let reverse = num < 0;
     for _ in 0..num.abs() {
@@ -69,6 +79,7 @@ fn any_i32(num: i32, sides:u8) -> i32 {
 }
 
 impl DiceExt for i32 {
+    fn d(&self, sides: usize) -> Self { any_i32(*self, sides) }
     fn d2(&self) -> Self { any_i32(*self, 2)}
     fn d3(&self) -> Self { any_i32(*self, 3)}
     fn d4(&self) -> Self { any_i32(*self, 4)}
@@ -101,7 +112,7 @@ pub trait PercentageVariance {
     /**
      Take a number and alter it by up to (or less, of course) +/- X%.
     */
-    fn delta(&self, percentage:i32) -> Self;
+    fn delta(&self, percentage: i32) -> Self;
 }
 
 /**
@@ -111,17 +122,17 @@ pub trait FixedNumberVariance<T: Float> {
     /**
      Take a number and alter it +/- by \[**0 .. *upto***\], and return result.
      */
-    fn upto_delta(&self, upto:T) -> T;
+    fn upto_delta(&self, upto: T) -> T;
 }
 
 impl FixedNumberVariance<f64> for f64 {
-    fn upto_delta(&self, upto:Self) -> Self {
+    fn upto_delta(&self, upto: Self) -> Self {
         self + rand::thread_rng().gen_range(-upto..=upto)
     }
 }
 
 impl FixedNumberVariance<f32> for f32 {
-    fn upto_delta(&self, upto:Self) -> Self {
+    fn upto_delta(&self, upto: Self) -> Self {
         self + rand::thread_rng().gen_range(-upto..=upto)
     }
 }
@@ -166,11 +177,25 @@ macro_rules! hi {
 mod dice_tests {
     use crate::DiceExt;
 
+    /**
+     See that D6 rolls stay within range.
+     */
     #[test]
-    fn dice_stay_in_range() {
+    fn d6_stay_in_range() {
         for _ in 0..10_000 {
             let d = 1.d6();
             assert!(d >= 1 && d <= 6);
+        }
+    }
+
+    /**
+     See that d(100) rolls stay within range.
+     */
+    #[test]
+    fn d100_stay_in_range() {
+        for _ in 0..10_000 {
+            let d = 1.d(100);
+            assert!(d >= 1 && d <= 100);
         }
     }
 }
