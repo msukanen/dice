@@ -141,7 +141,7 @@ impl FixedNumberVariance<f32> for f32 {
 }
 
 /**
- Take a number and alter it by up to (or less, of course) +/- X%.
+ Take a number and alter it by up to (or less, of course) ±X%.
  */
 fn delta_p<T: Float + ToPrimitive>(original: &T, percentage: i32) -> T {
     let p = 0.01 * percentage as f64;
@@ -176,6 +176,22 @@ macro_rules! hi {
     }
 }
 
+#[macro_export]
+/**
+ `$chance`% of `$v`, otherwise `0`.
+
+ ## Usage
+ ```
+   // 90% chance of x ending up being 10, otherwise 0.
+   let x = chance_of!(90, 10);
+ ```
+ */
+macro_rules! chance_of {
+    ($chance:expr, $v:expr) => {
+        if 1.d100() <= $chance { $v } else { 0 }
+    }
+}
+
 #[cfg(test)]
 mod dice_tests {
     use crate::DiceExt;
@@ -199,6 +215,13 @@ mod dice_tests {
         for _ in 0..10_000 {
             let d = 1.d(97);
             assert!(d >= 1 && d <= 97);
+        }
+    }
+
+    #[test]
+    fn chance_macro_works() {
+        for _ in 0..20 {
+            println!("{}", chance_of!(5, 50))
         }
     }
 }
