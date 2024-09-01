@@ -4,74 +4,42 @@
 use rand::Rng;
 use num::{ Float, Integer, NumCast, ToPrimitive };
 
-/**
- Dice extensions.
- */
+/// Dice extensions.
 pub trait DiceExt {
-    /**
-     Roll any D.
-     */
+    /// Roll any D.
     fn d(&self, sides: usize) -> Self;
-    /**
-     Roll a D2.
-     */
+    /// Roll a D2.
     fn d2(&self) -> Self;
-    /**
-     Roll a D3.
-     */
+    /// Roll a D3.
     fn d3(&self) -> Self;
-    /**
-     Roll a D4.
-     */
+    /// Roll a D4.
     fn d4(&self) -> Self;
-    /**
-     Roll a D5.
-     */
+    /// Roll a D5.
     fn d5(&self) -> Self;
-    /**
-     Roll a D6.
-     */
+    /// Roll a D6.
     fn d6(&self) -> Self;
-    /**
-     Roll a D8.
-     */
+    /// Roll a D8.
     fn d8(&self) -> Self;
-    /**
-     Roll a D10.
-     */
+    /// Roll a D10.
     fn d10(&self) -> Self;
-    /**
-     Roll a D12.
-     */
+    /// Roll a D12.
     fn d12(&self) -> Self;
-    /**
-     Roll a D20.
-     */
+    /// Roll a D20.
     fn d20(&self) -> Self;
-    /**
-     Roll a D100.
-     */
+    /// Roll a D100.
     fn d100(&self) -> Self;
-    /**
-     If chance on `d100` matches `of` then return *self*, otherwise return `None`.
-     */
+    /// If chance on `d100` matches `of` then return *self*, otherwise return `None`.
     fn chance(&self, of:i32) -> Option<i32>;
 }
 
 pub trait HiLo {
-    /**
-     Value is considered "high"?
-     */
+    /// Value is considered "high"?
     fn hi(&self) -> bool;
-    /**
-     Value is considered "low"?
-     */
+    /// Value is considered "low"?
     fn lo(&self) -> bool;
 }
 
-/**
- Throw given `num` of dice, each with x `sides`.
- */
+/// Throw given `num` of dice, each with x `sides`.
 fn any_i32(num: i32, sides: usize) -> i32 {
     let mut result: i32 = 0;
     let reverse = num < 0;
@@ -108,23 +76,15 @@ impl HiLo for i32 {
     }
 }
 
-/**
- Percentage amount value variator(s).
- */
+/// Percentage amount value variator(s).
 pub trait PercentageVariance {
-    /**
-     Take a number and alter it by up to (or less, of course) +/- X%.
-    */
+    /// Take a number and alter it by up to (or less, of course) ±X%.
     fn delta(&self, percentage: i32) -> Self;
 }
 
-/**
- Fixed value value variator(s).
- */
+/// Fixed value value variator(s).
 pub trait FixedNumberVariance<T: Float> {
-    /**
-     Take a number and alter it +/- by \[**0 .. *upto***\], and return result.
-     */
+    /// Take a number and alter it ± by \[**0 .. *upto***\], and return result.
     fn upto_delta(&self, upto: T) -> T;
 }
 
@@ -140,9 +100,7 @@ impl FixedNumberVariance<f32> for f32 {
     }
 }
 
-/**
- Take a number and alter it by up to (or less, of course) ±X%.
- */
+/// Take a number and alter it by up to (or less, of course) ±X%.
 fn delta_p<T: Float + ToPrimitive>(original: &T, percentage: i32) -> T {
     let p = 0.01 * percentage as f64;
     *original * NumCast::from(1.0 + rand::thread_rng().gen_range(-p..=p)).unwrap()
@@ -157,24 +115,12 @@ impl PercentageVariance for f64 {
 }
 
 #[macro_export]
-/**
- Roll some arbitrary dice and see if their result is "low".
- */
-macro_rules! lo {
-    () => {
-        1.d2().lo()
-    }
-}
+/// Roll some arbitrary dice and see if their result is "low".
+macro_rules! lo {() => { 1_i32.d2().lo() }}
 
 #[macro_export]
-/**
- Roll some arbitrary dice and see if their result is "high".
- */
-macro_rules! hi {
-    () => {
-        !low!()
-    }
-}
+/// Roll some arbitrary dice and see if their result is "high".
+macro_rules! hi {() => {!lo!()}}
 
 #[macro_export]
 /**
@@ -196,9 +142,7 @@ macro_rules! chance_of {
 mod dice_tests {
     use crate::DiceExt;
 
-    /**
-     See that D6 rolls stay within range.
-     */
+    /// See that D6 rolls stay within range.
     #[test]
     fn d6_stay_in_range() {
         for _ in 0..10_000 {
@@ -207,9 +151,7 @@ mod dice_tests {
         }
     }
 
-    /**
-     See that d(97) rolls stay within range.
-     */
+    /// See that d(97) rolls stay within range.
     #[test]
     fn d97_stay_in_range() {
         for _ in 0..10_000 {
