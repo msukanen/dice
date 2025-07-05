@@ -51,7 +51,7 @@ pub trait FixedNumberVariance<T: Float> {
 /// Take a number and alter it by up to (or less, of course) ±X%.
 fn delta_p<T: Float + ToPrimitive>(original: &T, percentage: i32) -> T {
     let p = 0.01 * percentage as f64;
-    *original * NumCast::from(1.0 + rand::thread_rng().gen_range(-p..=p)).unwrap()
+    *original * NumCast::from(1.0 + rand::rng().random_range(-p..=p)).unwrap()
 }
 
 #[macro_export]
