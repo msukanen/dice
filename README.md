@@ -4,7 +4,7 @@ This library contains various "dice rolling" functions and traits.
 
 # dicebag::DiceExt
 
-Dice rolling is currently implemented only for `i32`.
+Dice rolling is currently implemented for most basic numeric types from i8 to i128, u8 to u128, and usize.
 
 ## Usage
 
