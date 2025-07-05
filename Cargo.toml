@@ -1,11 +1,12 @@
 [package]
 name = "dicebag"
-version = "0.2.1"
-edition = "2021"
+version = "0.3.0"
+edition = "2024"
 description = "Dice rolling!"
 license = "MIT OR Apache-2.0"
-authors = ["Markku Sukanen"]
+authors = ["Markku Sukanen <markku.sukanen@gmail.com>"]
 
 [dependencies]
-rand = "0.8"
-num = "0.4"
+rand = "0.9.1"
+num = "0.4.3"
+paste = "1.0.15"

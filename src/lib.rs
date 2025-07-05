@@ -1,8 +1,7 @@
-//!
 //! Dice rolling!
-//! 
 use rand::Rng;
 use num::{ Float, Integer, NumCast, ToPrimitive };
+use paste::paste;
 
 /// Dice extensions.
 pub trait DiceExt {
@@ -28,8 +27,6 @@ pub trait DiceExt {
     fn d20(&self) -> Self;
     /// Roll a D100.
     fn d100(&self) -> Self;
-    /// If chance on `d100` matches `of` then return *self*, otherwise return `None`.
-    fn chance(&self, of:i32) -> Option<i32>;
 }
 
 pub trait HiLo {
@@ -37,43 +34,6 @@ pub trait HiLo {
     fn hi(&self) -> bool;
     /// Value is considered "low"?
     fn lo(&self) -> bool;
-}
-
-/// Throw given `num` of dice, each with x `sides`.
-fn any_i32(num: i32, sides: usize) -> i32 {
-    let mut result: i32 = 0;
-    let reverse = num < 0;
-    for _ in 0..num.abs() {
-        result += rand::thread_rng().gen_range(1..=(sides as i32));
-    }
-    if reverse {-result} else {result}
-}
-
-impl DiceExt for i32 {
-    fn d(&self, sides: usize) -> Self { any_i32(*self, sides) }
-    fn d2(&self) -> Self { any_i32(*self, 2)}
-    fn d3(&self) -> Self { any_i32(*self, 3)}
-    fn d4(&self) -> Self { any_i32(*self, 4)}
-    fn d5(&self) -> Self { any_i32(*self, 5)}
-    fn d6(&self) -> Self { any_i32(*self, 6)}
-    fn d8(&self) -> Self { any_i32(*self, 8)}
-    fn d10(&self) -> Self { any_i32(*self, 10)}
-    fn d12(&self) -> Self { any_i32(*self, 12)}
-    fn d20(&self) -> Self { any_i32(*self, 20)}
-    fn d100(&self) -> Self { any_i32(*self, 100)}
-    fn chance(&self, of:i32) -> Option<i32> {
-        if 3.d6() as Self <= *self {Some(of)} else {None}
-    }
-}
-
-impl HiLo for i32 {
-    fn hi(&self) -> bool {
-        self.is_even()
-    }
-
-    fn lo(&self) -> bool {
-        self.is_odd()
-    }
 }
 
 /// Percentage amount value variator(s).
@@ -88,30 +48,10 @@ pub trait FixedNumberVariance<T: Float> {
     fn upto_delta(&self, upto: T) -> T;
 }
 
-impl FixedNumberVariance<f64> for f64 {
-    fn upto_delta(&self, upto: Self) -> Self {
-        self + rand::thread_rng().gen_range(-upto..=upto)
-    }
-}
-
-impl FixedNumberVariance<f32> for f32 {
-    fn upto_delta(&self, upto: Self) -> Self {
-        self + rand::thread_rng().gen_range(-upto..=upto)
-    }
-}
-
 /// Take a number and alter it by up to (or less, of course) ±X%.
 fn delta_p<T: Float + ToPrimitive>(original: &T, percentage: i32) -> T {
     let p = 0.01 * percentage as f64;
     *original * NumCast::from(1.0 + rand::thread_rng().gen_range(-p..=p)).unwrap()
-}
-
-impl PercentageVariance for f32 {
-    fn delta(&self, percentage:i32) -> Self { delta_p::<Self>(self, percentage) }
-}
-
-impl PercentageVariance for f64 {
-    fn delta(&self, percentage:i32) -> Self { delta_p::<Self>(self, percentage) }
 }
 
 #[macro_export]
@@ -128,19 +68,107 @@ macro_rules! hi {() => {!lo!()}}
 
  ## Usage
  ```
-   // 90% chance of x ending up being 10, otherwise 0.
-   let x = chance_of!(90, 10);
+    use dicebag::{DiceExt, percentage_chance_of};
+    // 90% chance of x ending up being 10, otherwise 0.
+    let x = percentage_chance_of!(90, 10);
  ```
  */
-macro_rules! chance_of {
+macro_rules! percentage_chance_of {
     ($chance:expr, $v:expr) => {
         if 1.d100() <= $chance { $v } else { 0 }
     }
 }
 
+macro_rules! implement_sign_dependant_diceext {
+    ($t:ty, signed) => {paste! {
+        fn [<diceabs _ $t>](num: $t) -> $t {num.abs()}
+        fn [<dicerev _ $t>](num: $t) -> $t {-num}
+        fn [<dicelt0 _ $t>](num: $t) -> bool { num < 0 }
+    }};
+    ($t:ty, unsigned) => {paste! {
+        fn [<diceabs _ $t>](num: $t) -> $t {num}
+        fn [<dicerev _ $t>](num: $t) -> $t {num}
+        fn [<dicelt0 _ $t>](num: $t) -> bool { false }
+    }};
+}
+
+implement_sign_dependant_diceext!(i8, signed);
+implement_sign_dependant_diceext!(i16, signed);
+implement_sign_dependant_diceext!(i32, signed);
+implement_sign_dependant_diceext!(i64, signed);
+implement_sign_dependant_diceext!(i128, signed);
+implement_sign_dependant_diceext!(u8, unsigned);
+implement_sign_dependant_diceext!(u16, unsigned);
+implement_sign_dependant_diceext!(u32, unsigned);
+implement_sign_dependant_diceext!(u64, unsigned);
+implement_sign_dependant_diceext!(u128, unsigned);
+implement_sign_dependant_diceext!(usize, unsigned);
+
+macro_rules! implement_diceext {
+    ( for $($t:ty),+) => {
+        $(
+            paste! {
+                impl DiceExt for $t {
+                    fn d(&self, sides: usize) -> Self { [<any _ $t>](*self, sides) }
+                    fn d2(&self) -> Self { [<any _ $t>](*self, 2)}
+                    fn d3(&self) -> Self { [<any _ $t>](*self, 3)}
+                    fn d4(&self) -> Self { [<any _ $t>](*self, 4)}
+                    fn d5(&self) -> Self { [<any _ $t>](*self, 5)}
+                    fn d6(&self) -> Self { [<any _ $t>](*self, 6)}
+                    fn d8(&self) -> Self { [<any _ $t>](*self, 8)}
+                    fn d10(&self) -> Self { [<any _ $t>](*self, 10)}
+                    fn d12(&self) -> Self { [<any _ $t>](*self, 12)}
+                    fn d20(&self) -> Self { [<any _ $t>](*self, 20)}
+                    fn d100(&self) -> Self { [<any _ $t>](*self, 100)}
+                }
+
+                /// Throw given `num` of dice, each with x `sides`.
+                fn [<any _ $t>](num: $t, sides: usize) -> $t {
+                    let mut result: $t = 0;
+                    let reverse = [<dicelt0 _ $t>](num);
+                    let mut rng = rand::rng();
+                    for _ in 0..[<diceabs _ $t>](num) {
+                        result += rng.random_range(1..=(sides as $t));
+                    }
+                    if reverse {[<dicerev _ $t>](result)} else {result}
+                }
+            }
+
+            impl HiLo for $t {
+                fn hi(&self) -> bool {
+                    self.is_even()
+                }
+
+                fn lo(&self) -> bool {
+                    self.is_odd()
+                }
+            }
+        )+
+    };
+}
+
+macro_rules! implement_float_diceext {
+    ( for $($t:ty),+) => {
+        $(
+            impl FixedNumberVariance<$t> for $t {
+                fn upto_delta(&self, upto: Self) -> Self {
+                    self + rand::rng().random_range(-upto..=upto)
+                }
+            }
+
+            impl PercentageVariance for $t {
+                fn delta(&self, percentage:i32) -> Self { delta_p::<Self>(self, percentage) }
+            }
+        )+
+    };
+}
+
+implement_diceext!(for i32, i64, i128, u32, u64, u128, usize);
+implement_float_diceext!(for f32, f64);//f128 unstable at time of writing... July 6, 2025.
+
 #[cfg(test)]
 mod dice_tests {
-    use crate::DiceExt;
+    use crate::{DiceExt, percentage_chance_of};
 
     /// See that D6 rolls stay within range.
     #[test]
@@ -163,7 +191,7 @@ mod dice_tests {
     #[test]
     fn chance_macro_works() {
         for _ in 0..20 {
-            println!("{}", chance_of!(5, 50))
+            println!("{}", percentage_chance_of!(5, 50))
         }
     }
 }
