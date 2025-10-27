@@ -48,6 +48,16 @@ pub trait FixedNumberVariance<T: Float> {
     fn upto_delta(&self, upto: T) -> T;
 }
 
+pub trait IsOne {
+    fn is_one(&self) -> bool;
+}
+
+impl IsOne for i32 {
+    fn is_one(&self) -> bool {
+        *self == 1
+    }
+}
+
 /// Take a number and alter it by up to (or less, of course) ±X%.
 fn delta_p<T: Float + ToPrimitive>(original: &T, percentage: i32) -> T {
     let p = 0.01 * percentage as f64;
