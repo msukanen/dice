@@ -3,6 +3,8 @@ use rand::Rng;
 use num::{ Float, Integer, NumCast, ToPrimitive };
 use paste::paste;
 
+pub type DiceT = (i32,i32);
+
 /// Dice extensions.
 pub trait DiceExt {
     /// Roll any D.
