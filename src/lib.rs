@@ -60,6 +60,16 @@ impl IsOne for i32 {
     }
 }
 
+pub trait InclusiveRandomRange {
+    fn random_of(&self) -> i32;
+}
+
+impl InclusiveRandomRange for std::ops::RangeInclusive<i32> {
+    fn random_of(&self) -> i32 {
+        rand::rng().random_range(*self.start()..=*self.end())
+    }
+}
+
 /// Take a number and alter it by up to (or less, of course) ±X%.
 fn delta_p<T: Float + ToPrimitive>(original: &T, percentage: i32) -> T {
     let p = 0.01 * percentage as f64;
