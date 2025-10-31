@@ -1,4 +1,9 @@
 //! Dice rolling!
+//! 
+//! In most cases, anything from `i8`/`u8` up to `i128`/`u128`
+//! and `usize` is supported (alongside `f32`/`f64` for a few
+//! functions).
+
 use rand::Rng;
 use num::{ Float, Integer, NumCast, ToPrimitive };
 use paste::paste;
@@ -185,7 +190,7 @@ macro_rules! implement_float_diceext {
     };
 }
 
-implement_diceext!(for i32, i64, i128, u32, u64, u128, usize);
+implement_diceext!(for i8, i16, i32, i64, i128, u8, u16, u32, u64, u128, usize);
 implement_float_diceext!(for f32, f64);//f128 unstable at time of writing... July 6, 2025.
 
 #[cfg(test)]
