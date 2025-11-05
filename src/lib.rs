@@ -75,15 +75,17 @@ impl InclusiveRandomRange for std::ops::RangeInclusive<i32> {
     }
 }
 
-pub trait RandomOf<T> {
+pub trait RandomOf<T> : Clone {
     type Output;
-    fn random_of(&self) -> &Self::Output;
+    fn random_of(&self) -> Self::Output;
 }
 
-impl<T> RandomOf<T> for Vec<T> {
+impl<T> RandomOf<T> for Vec<T>
+where T: Clone
+{
     type Output = T;
-    fn random_of(&self) -> &Self::Output {
-        &self[1.d(self.len())-1]
+    fn random_of(&self) -> Self::Output {
+        self[1.d(self.len())-1].clone()
     }
 }
 
@@ -238,8 +240,8 @@ mod dice_tests {
 
     #[test]
     fn random_of() {
-        let vs = vec![1,2,3,4,5];
-        let v = *vs.random_of();
-        assert_ne!(0, v);
+        let vs = vec![&1,&2,&3,&4,&5];
+        let v = vs.random_of();
+        assert_ne!(0, *v);
     }
 }
