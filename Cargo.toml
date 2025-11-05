@@ -1,6 +1,6 @@
 [package]
 name = "dicebag"
-version = "0.3.4"
+version = "0.3.5"
 edition = "2024"
 description = "Dice rolling!"
 license = "MIT OR Apache-2.0"

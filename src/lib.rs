@@ -75,6 +75,18 @@ impl InclusiveRandomRange for std::ops::RangeInclusive<i32> {
     }
 }
 
+pub trait RandomOf<T> {
+    type Output;
+    fn random_of(&self) -> &Self::Output;
+}
+
+impl<T> RandomOf<T> for Vec<T> {
+    type Output = T;
+    fn random_of(&self) -> &Self::Output {
+        &self[1.d(self.len())-1]
+    }
+}
+
 /// Take a number and alter it by up to (or less, of course) ±X%.
 fn delta_p<T: Float + ToPrimitive>(original: &T, percentage: i32) -> T {
     let p = 0.01 * percentage as f64;
@@ -193,9 +205,11 @@ macro_rules! implement_float_diceext {
 implement_diceext!(for i8, i16, i32, i64, i128, u8, u16, u32, u64, u128, usize);
 implement_float_diceext!(for f32, f64);//f128 unstable at time of writing... July 6, 2025.
 
+
+
 #[cfg(test)]
 mod dice_tests {
-    use crate::{DiceExt, percentage_chance_of};
+    use crate::{DiceExt, percentage_chance_of, RandomOf};
 
     /// See that D6 rolls stay within range.
     #[test]
@@ -220,5 +234,12 @@ mod dice_tests {
         for _ in 0..20 {
             println!("{}", percentage_chance_of!(5, 50))
         }
+    }
+
+    #[test]
+    fn random_of() {
+        let vs = vec![1,2,3,4,5];
+        let v = *vs.random_of();
+        assert_ne!(0, v);
     }
 }
