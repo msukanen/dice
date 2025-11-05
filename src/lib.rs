@@ -85,7 +85,7 @@ where T: Clone
 {
     type Output = T;
     fn random_of(&self) -> Self::Output {
-        self[1.d(self.len())-1].clone()
+        T::clone(&self[1.d(self.len())-1]).clone()
     }
 }
 
@@ -206,8 +206,6 @@ macro_rules! implement_float_diceext {
 
 implement_diceext!(for i8, i16, i32, i64, i128, u8, u16, u32, u64, u128, usize);
 implement_float_diceext!(for f32, f64);//f128 unstable at time of writing... July 6, 2025.
-
-
 
 #[cfg(test)]
 mod dice_tests {
