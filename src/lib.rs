@@ -110,8 +110,10 @@ pub trait HiLo {
 
 /// Percentage amount value variator(s).
 pub trait PercentageVariance {
-    /// Take a number and alter it by up to (or less, of course) ±X%.
+    #[deprecated(since = "0.3.11", note = "Use `jitter_percentage` instead.")]
     fn delta(&self, percentage: i32) -> Self;
+    /// Take a number and alter it by up to (or less, of course) ±X%.
+    fn jitter_percentage(&self, percentage: f64) -> Self;
 }
 
 /// Fixed value value variator(s).
@@ -193,8 +195,8 @@ where T: Clone
 }
 
 /// Take a number and alter it by up to (or less, of course) ±X%.
-fn delta_p<T: Float + ToPrimitive>(original: &T, percentage: i32) -> T {
-    let p = 0.01 * percentage as f64;
+fn jitter_perc<T: Float + ToPrimitive>(original: &T, percentage: f64) -> T {
+    let p = 0.01 * percentage;
     *original * NumCast::from(1.0 + rand::rng().random_range(-p..=p)).unwrap()
 }
 
@@ -303,7 +305,10 @@ macro_rules! implement_float_diceext {
             }
 
             impl PercentageVariance for $t {
-                fn delta(&self, percentage:i32) -> Self { delta_p::<Self>(self, percentage) }
+                fn delta(&self, percentage: i32) -> Self { self.jitter_percentage(percentage as f64) }
+                fn jitter_percentage(&self, percentage: f64) -> Self {
+                    jitter_perc::<Self>(self, percentage)
+                }
             }
         )+
     };
