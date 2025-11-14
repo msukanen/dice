@@ -9,10 +9,12 @@
 //! ## `DiceExt`
 //! 
 //! Covers the core intent dice rollings, e.g. `3.d6()`, `2.d10()`.
+//! 
 //! ```
 //! use dicebag::DiceExt;
 //! let a = 3.d6();
 //! let b = 2_u8.d4();
+//! let c = 5.d(a-3); // FYI: zero as dice size results in 0, no matter the number of dice...
 //! ```
 //! 
 //! ## `HiLo`
@@ -38,6 +40,10 @@
 //! ## `RandomOf<T>`
 //! 
 //! A trait to get some random entry of e.g. [Vec].
+//! 
+//! Just make sure your container has at least one entry in it as otherwise
+//! things will catch fire (panic). `.random_of()` really can't choose
+//! a random element out of nothing given…
 //! ```
 //! use dicebag::RandomOf;
 //! let v = vec![2,4,6,8,10];
@@ -138,11 +144,11 @@ implement_isone_prim!(64);
 implement_isone_prim!(128);
 implement_isone_prim!(size);
 
-pub trait InclusiveRandomRange {
-    fn random_of(&self) -> i32;
+pub trait InclusiveRandomRange<T> {
+    fn random_of(&self) -> T;
 }
 
-impl InclusiveRandomRange for std::ops::RangeInclusive<i32> {
+impl InclusiveRandomRange<i32> for std::ops::RangeInclusive<i32> {
     /// Generate random value within the given range.
     /// 
     /// ```
@@ -151,7 +157,20 @@ impl InclusiveRandomRange for std::ops::RangeInclusive<i32> {
     /// let roll = range.random_of();
     /// ```
     fn random_of(&self) -> i32 {
-        rand::rng().random_range(*self.start()..=*self.end())
+        let (mut start, mut end) = (*self.start(), *self.end());
+        // in case someone fed a range like 12..=6 ... play along and just inverse the ends.
+        if start > end {
+            std::mem::swap(&mut start, &mut end);
+        }
+        rand::rng().random_range(start..=end)
+    }
+}
+
+impl InclusiveRandomRange<f64> for std::ops::RangeInclusive<f64> {
+    fn random_of(&self) -> f64 {
+        let (mut start, mut end) = (*self.start(), *self.end());
+        if start > end { std::mem::swap(&mut start, &mut end); }// swap endpoints if needed…
+        rand::rng().random_range(start..=end)
     }
 }
 
@@ -166,6 +185,7 @@ where T: Clone
     type Output = T;
     /// Get a random item from some vector.
     fn random_of(&self) -> Self::Output {
+        if self.is_empty() { panic!("Nee-neer - pointing finger at dev(s). Empty Vec - can't pick a random from that. Anyway… Ta-ta 'til that's fixed.")}
         T::clone(&self[1.d(self.len())-1]).clone()
     }
 }
@@ -291,7 +311,7 @@ implement_float_diceext!(for f32, f64);//f128 unstable at time of writing... Jul
 
 #[cfg(test)]
 mod dice_tests {
-    use crate::{DiceExt, percentage_chance_of, RandomOf};
+    use crate::{DiceExt, InclusiveRandomRange, RandomOf, percentage_chance_of};
 
     /// See that D6 rolls stay within range.
     #[test]
@@ -319,9 +339,18 @@ mod dice_tests {
     }
 
     #[test]
-    fn random_of() {
+    fn random_of_vec() {
         let vs = vec![&1,&2,&3,&4,&5];
         let v = vs.random_of();
         assert_ne!(0, *v);
+    }
+
+    #[test]
+    fn random_of_f64() {
+        let vs = 0.5..=2.0;
+        for _ in 0..100_001 {
+            let v = vs.random_of();
+            assert!(vs.contains(&v))
+        }
     }
 }
