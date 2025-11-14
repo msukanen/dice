@@ -116,8 +116,10 @@ pub trait PercentageVariance {
 
 /// Fixed value value variator(s).
 pub trait FixedNumberVariance<T: Float> {
-    /// Take a number and alter it ± by \[**0 .. *upto***\], and return result.
+    #[deprecated(since="0.3.10", note="Use `jitter_within` insted. This will be removed soon.")]
     fn upto_delta(&self, upto: T) -> T;
+    /// Take a number and alter it ± by \[**0 .. *upto***\].
+    fn jitter_within(&self, upto: T) -> T;
 }
 
 /// "It's just one, isn't it?"…
@@ -294,7 +296,8 @@ macro_rules! implement_float_diceext {
     ( for $($t:ty),+) => {
         $(
             impl FixedNumberVariance<$t> for $t {
-                fn upto_delta(&self, upto: Self) -> Self {
+                fn upto_delta(&self, upto: Self) -> Self {self.jitter_within(upto)}
+                fn jitter_within(&self, upto: Self) -> Self {
                     self + rand::rng().random_range(-upto..=upto)
                 }
             }
