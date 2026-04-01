@@ -178,6 +178,14 @@ impl InclusiveRandomRange<f64> for std::ops::RangeInclusive<f64> {
     }
 }
 
+impl InclusiveRandomRange<char> for std::ops::RangeInclusive<char> {
+    fn random_of(&self) -> char {
+        let (mut start, mut end) = (*self.start(), *self.end());
+        if start > end { std::mem::swap(&mut start, &mut end); }// swap endpoints if needed…
+        rand::rng().random_range(start..=end)
+    }
+}
+
 pub trait RandomOf<T> : Clone {
     type Output;
     fn random_of(&self) -> Self::Output;
@@ -319,7 +327,7 @@ implement_float_diceext!(for f32, f64);//f128 unstable at time of writing... Jul
 
 #[cfg(test)]
 mod dice_tests {
-    use crate::{DiceExt, InclusiveRandomRange, RandomOf, percentage_chance_of};
+    use super::*;
 
     /// See that D6 rolls stay within range.
     #[test]
