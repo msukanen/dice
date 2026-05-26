@@ -211,7 +211,7 @@ where T: Clone
     /// Get a random item from some vector.
     fn random_of(&self) -> Self::Output {
         if self.is_empty() { panic!("Nee-neer - pointing finger at dev(s). Empty HashSet - can't pick a random from that. Anyway… Ta-ta 'til that's fixed.")}
-        let Some(ent) = self.iter().nth(self.len()-1) else {
+        let Some(ent) = self.iter().nth(rand::rng().random_range(0..self.len())) else {
             panic!("For some reason the HashSet has less entries in it than .len() suggests?!");
         };
         T::clone(ent)
