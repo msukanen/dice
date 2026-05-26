@@ -58,7 +58,7 @@
 //! 
 use std::collections::HashSet;
 
-use rand::Rng;
+use rand::RngExt;
 use num::{ Float, Integer, NumCast, ToPrimitive };
 use paste::paste;
 
