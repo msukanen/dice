@@ -56,6 +56,8 @@
 //! assert!(x.tag == "a" || x.tag == "b" || x.tag == "c");
 //! ```
 //! 
+use std::collections::HashSet;
+
 use rand::Rng;
 use num::{ Float, Integer, NumCast, ToPrimitive };
 use paste::paste;
@@ -198,7 +200,21 @@ where T: Clone
     /// Get a random item from some vector.
     fn random_of(&self) -> Self::Output {
         if self.is_empty() { panic!("Nee-neer - pointing finger at dev(s). Empty Vec - can't pick a random from that. Anyway… Ta-ta 'til that's fixed.")}
-        T::clone(&self[1.d(self.len())-1]).clone()
+        T::clone(&self[1.d(self.len())-1])
+    }
+}
+
+impl<T> RandomOf<T> for HashSet<T>
+where T: Clone
+{
+    type Output = T;
+    /// Get a random item from some vector.
+    fn random_of(&self) -> Self::Output {
+        if self.is_empty() { panic!("Nee-neer - pointing finger at dev(s). Empty HashSet - can't pick a random from that. Anyway… Ta-ta 'til that's fixed.")}
+        let Some(ent) = self.iter().nth(self.len()-1) else {
+            panic!("For some reason the HashSet has less entries in it than .len() suggests?!");
+        };
+        T::clone(ent)
     }
 }
 
@@ -242,7 +258,7 @@ macro_rules! implement_sign_dependant_diceext {
     ($t:ty, unsigned) => {paste! {
         fn [<diceabs _ $t>](num: $t) -> $t {num}
         fn [<dicerev _ $t>](num: $t) -> $t {num}
-        fn [<dicelt0 _ $t>](num: $t) -> bool { false }
+        fn [<dicelt0 _ $t>](_: $t) -> bool { false }
     }};
 }
 
