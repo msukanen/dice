@@ -244,9 +244,13 @@ macro_rules! hi {() => {!lo!()}}
  ```
  */
 macro_rules! percentage_chance_of {
+    ($chance:expr, f $v:expr) => {
+        if 1.d100() <= $chance { $v } else { 0.0 }
+    };
+
     ($chance:expr, $v:expr) => {
         if 1.d100() <= $chance { $v } else { 0 }
-    }
+    };
 }
 
 macro_rules! implement_sign_dependant_diceext {
