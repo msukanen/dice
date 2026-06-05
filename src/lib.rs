@@ -226,11 +226,11 @@ fn jitter_perc<T: Float + ToPrimitive>(original: &T, percentage: f64) -> T {
 
 #[macro_export]
 /// Roll some arbitrary dice and see if their result is "low".
-macro_rules! lo {() => { 1_i32.d2().lo() }}
+macro_rules! lo {() => {{ use ::HiLo; 1_i32.d2().lo() }}}
 
 #[macro_export]
 /// Roll some arbitrary dice and see if their result is "high".
-macro_rules! hi {() => {!lo!()}}
+macro_rules! hi {() => { !::lo!()} }
 
 #[macro_export]
 /**
