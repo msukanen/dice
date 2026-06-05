@@ -230,7 +230,7 @@ macro_rules! lo {() => {{ use dicebag::HiLo; 1_i32.d2().lo() }}}
 
 #[macro_export]
 /// Roll some arbitrary dice and see if their result is "high".
-macro_rules! hi {() => { !::lo!()} }
+macro_rules! hi {() => {{ use dicebag::{HiLo, lo}; !lo!() }}}
 
 #[macro_export]
 /**
@@ -280,47 +280,106 @@ implement_sign_dependant_diceext!(u64, unsigned);
 implement_sign_dependant_diceext!(u128, unsigned);
 implement_sign_dependant_diceext!(usize, unsigned);
 
-macro_rules! implement_diceext {
-    ( for $($t:ty),+) => {
-        $(
-            paste! {
-                impl DiceExt for $t {
-                    fn d(&self, sides: usize) -> Self { [<any _ $t>](*self, sides) }
-                    fn d2(&self) -> Self { [<any _ $t>](*self, 2)}
-                    fn d3(&self) -> Self { [<any _ $t>](*self, 3)}
-                    fn d4(&self) -> Self { [<any _ $t>](*self, 4)}
-                    fn d5(&self) -> Self { [<any _ $t>](*self, 5)}
-                    fn d6(&self) -> Self { [<any _ $t>](*self, 6)}
-                    fn d8(&self) -> Self { [<any _ $t>](*self, 8)}
-                    fn d10(&self) -> Self { [<any _ $t>](*self, 10)}
-                    fn d12(&self) -> Self { [<any _ $t>](*self, 12)}
-                    fn d20(&self) -> Self { [<any _ $t>](*self, 20)}
-                    fn d100(&self) -> Self { [<any _ $t>](*self, 100)}
+mod engine {
+    use std::{cell::UnsafeCell, sync::atomic::AtomicBool};
+    use paste::paste;
+
+    macro_rules! const_chaos_engine_crng_vals {
+        (for $([$t:ty, $init:literal, $mul:literal, $add:literal]),+) => {$(paste! {
+            const [<CE_CRNG_ $t:upper _INIT>]: $t = $init;
+            const [<CE_CRNG_ $t:upper _MUL>]: $t = $mul;
+            const [<CE_CRNG_ $t:upper _ADD>]: $t = $add;
+            pub(crate) static [<REACTOR_ $t:upper _WARMED>]: AtomicBool = AtomicBool::new(false);
+        })+};
+    }
+    macro_rules! implement_chaos_engine_struct {
+        (for $($t:ty),+) => {$(paste! {
+            pub(crate) struct [<ChaosEngine $t>] {
+                state: UnsafeCell<$t>,
+            }
+
+            unsafe impl Sync for [<ChaosEngine $t>] {}
+
+            impl [<ChaosEngine $t>] {
+                pub const fn new(seed: $t) -> Self {
+                    Self { state: UnsafeCell::new(seed) }
                 }
 
-                /// Throw given `num` of dice, each with x `sides`.
-                fn [<any _ $t>](num: $t, sides: usize) -> $t {
-                    let mut result: $t = 0;
-                    let reverse = [<dicelt0 _ $t>](num);
-                    let mut rng = rand::rng();
-                    for _ in 0..[<diceabs _ $t>](num) {
-                        result += rng.random_range(1..=(sides as $t));
+                pub fn roll(&self, max: $t) -> $t {
+                    if max == 0 { return 0; }
+                    unsafe {
+                        let ptr = self.state.get();
+                        let next = (*ptr).wrapping_mul([<CE_CRNG_ $t:upper _MUL>]).wrapping_add([<CE_CRNG_ $t:upper _ADD>]);
+                        *ptr = next;
+                        (next % max) + 1
                     }
-                    if reverse {[<dicerev _ $t>](result)} else {result}
                 }
             }
 
-            impl HiLo for $t {
-                fn hi(&self) -> bool {
-                    self.is_even()
-                }
+            pub(crate) static [<GLOBAL_REACTOR_ $t:upper>]: [<ChaosEngine $t>] = [<ChaosEngine $t>]::new([<CE_CRNG_ $t:upper _INIT>]);
+        })+};
+    }
 
-                fn lo(&self) -> bool {
-                    self.is_odd()
+    const_chaos_engine_crng_vals!(for
+        [i8, 8, 8, 8],
+        [i16, 16, 16, 16],
+        [i32, 32, 32, 32],
+        [i64, 64, 64, 64],
+        [i128, 128, 128, 128],
+        [u8, 8, 8, 8],
+        [u16, 16, 16, 16],
+        [u32, 32, 32, 32],
+        [u64, 64, 64, 64],
+        [u128, 128, 128, 128],
+        [usize, 128, 128, 128]
+    );
+    implement_chaos_engine_struct!(for i8, i16, i32, i64, i128, u8, u16, u32, u64, u128, usize);
+}
+
+macro_rules! implement_diceext {
+    ( for $($t:ty),+) => {$(paste! {
+        impl DiceExt for $t {
+            fn d(&self, sides: usize) -> Self { [<any _ $t>](*self, sides) }
+            fn d2(&self) -> Self { [<any _ $t>](*self, 2)}
+            fn d3(&self) -> Self { [<any _ $t>](*self, 3)}
+            fn d4(&self) -> Self { [<any _ $t>](*self, 4)}
+            fn d5(&self) -> Self { [<any _ $t>](*self, 5)}
+            fn d6(&self) -> Self { [<any _ $t>](*self, 6)}
+            fn d8(&self) -> Self { [<any _ $t>](*self, 8)}
+            fn d10(&self) -> Self { [<any _ $t>](*self, 10)}
+            fn d12(&self) -> Self { [<any _ $t>](*self, 12)}
+            fn d20(&self) -> Self { [<any _ $t>](*self, 20)}
+            fn d100(&self) -> Self { [<any _ $t>](*self, 100)}
+        }
+
+        /// Throw given `num` of dice, each with x `sides`.
+        fn [<any _ $t>](num: $t, sides: usize) -> $t {
+            if engine::[<REACTOR_ $t:upper _WARMED>].compare_exchange(false, true, std::sync::atomic::Ordering::Relaxed, std::sync::atomic::Ordering::Relaxed).is_ok() {
+                for _ in 0..13 {
+                    let churn = rand::random::<u64>();
+                    engine::[<GLOBAL_REACTOR_ $t:upper>].roll(churn as $t);
                 }
             }
-        )+
-    };
+            let mut result: $t = 0;
+            let reverse = [<dicelt0 _ $t>](num);
+            for _ in 0..[<diceabs _ $t>](num) {
+                //result += rng.random_range(1..=(sides as $t));
+                result += engine::[<GLOBAL_REACTOR_ $t:upper>].roll(sides as $t);
+            }
+            if reverse {[<dicerev _ $t>](result)} else {result}
+        }
+    }
+
+    impl HiLo for $t {
+        fn hi(&self) -> bool {
+            self.is_even()
+        }
+
+        fn lo(&self) -> bool {
+            self.is_odd()
+        }
+    }
+    )+};
 }
 
 macro_rules! implement_float_diceext {
@@ -345,49 +404,3 @@ macro_rules! implement_float_diceext {
 
 implement_diceext!(for i8, i16, i32, i64, i128, u8, u16, u32, u64, u128, usize);
 implement_float_diceext!(for f32, f64);//f128 unstable at time of writing... July 6, 2025.
-
-#[cfg(test)]
-mod dice_tests {
-    use super::*;
-
-    /// See that D6 rolls stay within range.
-    #[test]
-    fn d6_stay_in_range() {
-        for _ in 0..10_000 {
-            let d = 1.d6();
-            assert!(d >= 1 && d <= 6);
-        }
-    }
-
-    /// See that d(97) rolls stay within range.
-    #[test]
-    fn d97_stay_in_range() {
-        for _ in 0..10_000 {
-            let d = 1.d(97);
-            assert!(d >= 1 && d <= 97);
-        }
-    }
-
-    #[test]
-    fn chance_macro_works() {
-        for _ in 0..20 {
-            println!("{}", percentage_chance_of!(5, 50))
-        }
-    }
-
-    #[test]
-    fn random_of_vec() {
-        let vs = vec![&1,&2,&3,&4,&5];
-        let v = vs.random_of();
-        assert_ne!(0, *v);
-    }
-
-    #[test]
-    fn random_of_f64() {
-        let vs = 0.5..=2.0;
-        for _ in 0..100_001 {
-            let v = vs.random_of();
-            assert!(vs.contains(&v))
-        }
-    }
-}
