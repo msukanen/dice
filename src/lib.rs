@@ -285,7 +285,7 @@ mod engine {
     use paste::paste;
 
     macro_rules! const_chaos_engine_crng_vals {
-        (for $([$t:ty, $init:literal, $mul:literal, $add:literal]),+) => {$(paste! {
+        (for $([$t:ty, $init:literal, $mul:expr, $add:literal]),+) => {$(paste! {
             const [<CE_CRNG_ $t:upper _INIT>]: $t = $init;
             const [<CE_CRNG_ $t:upper _MUL>]: $t = $mul;
             const [<CE_CRNG_ $t:upper _ADD>]: $t = $add;
@@ -321,19 +321,20 @@ mod engine {
     }
 
     const_chaos_engine_crng_vals!(for
-        [i8, 8, 8, 8],
-        [i16, 16, 16, 16],
-        [i32, 32, 32, 32],
-        [i64, 64, 64, 64],
-        [i128, 128, 128, 128],
-        [u8, 8, 8, 8],
-        [u16, 16, 16, 16],
-        [u32, 32, 32, 32],
-        [u64, 64, 64, 64],
-        [u128, 128, 128, 128],
-        [usize, 128, 128, 128]
+        [i8, 9, 85, 33],
+        [i16, 17, 25173, 13849],
+        [i32, 33, 1664525, 1013904223],
+        [i64, 65, 6364136223846793005, 1442695040888963407],
+        [i128, 129, 22695477 as i128, 1],
+        [isize, 321, 6364136223846793005, 1442695040888963407],
+        [u8, 11, 85, 33],
+        [u16, 19, 25173, 13849],
+        [u32, 35, 1664525, 1013904223],
+        [u64, 67, 6364136223846793005, 1442695040888963407],
+        [u128, 131, 22695477 as u128, 1],
+        [usize, 747, 6364136223846793005, 1442695040888963407]
     );
-    implement_chaos_engine_struct!(for i8, i16, i32, i64, i128, u8, u16, u32, u64, u128, usize);
+    implement_chaos_engine_struct!(for i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
 }
 
 macro_rules! implement_diceext {
@@ -402,5 +403,5 @@ macro_rules! implement_float_diceext {
     };
 }
 
-implement_diceext!(for i8, i16, i32, i64, i128, u8, u16, u32, u64, u128, usize);
+implement_diceext!(for i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
 implement_float_diceext!(for f32, f64);//f128 unstable at time of writing... July 6, 2025.
