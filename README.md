@@ -1,6 +1,8 @@
-# Dicebag
+# Dicebag — Kawaii Chaos, Industrial-Grade Randomness
 
 This library contains various "dice rolling" functions and traits.
+
+## Primitives? Yes, please
 
 In most cases, anything from `i8`/`u8` up to `i128`/`u128`
 and `usize` is supported (alongside `f32`/`f64` for a few
@@ -61,5 +63,33 @@ assert!(x.tag == "a" || x.tag == "b" || x.tag == "c");
 
 ## Technobabble
 
-***dicebag*** isn't a PRNG, and it's not CRNG either. It's Chaos-RNG.
-It by nature is meant to produce random values which cannot be reproduced.
+***dicebag*** isn't a PRNG, and it's not CRNG either. It's **Chaos-RNG**,
+a one-way entropy shredder.
+
+By design, it:
+
+* does **not** produce reproducible sequences
+* does **not** preserve information
+* does **not** support seeding (nor could it, even if tried)
+* cannot be reversed
+* cannot be predicted
+* cannot be modeled
+* cannot be replayed
+
+…ergo, if you attempt to use ***dicebag*** for encoding, encryption,
+obfuscation, or *anything* requiring deterministic output, please don't —
+the result will be unrecoverable, unrepeatabe, and basically un-anything-able.
+
+```text
+input →  (っ◔◡◔)っ  ~{ swirl }~
+                     ↳ output dissolved
+
+         .-------.
+        /  CHAOS  \
+       |  RNG CORE |
+        \  _____  /
+         |/     \|
+    input         out ~~> [noise]
+                   \
+                    \__ unrecoverable
+```
