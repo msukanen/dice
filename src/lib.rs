@@ -198,8 +198,11 @@ where T: Clone
 {
     type Output = T;
     /// Get a random item from some vector.
+    /// 
+    /// # Panic
+    /// An empty `Vec` will cause a panic.
     fn random_of(&self) -> Self::Output {
-        if self.is_empty() { panic!("Nee-neer - pointing finger at dev(s). Empty Vec - can't pick a random from that. Anyway… Ta-ta 'til that's fixed.")}
+        if self.is_empty() { panic!("Empty Vec - can't pick a random from that. Anyway… Ta-ta 'til that's fixed.")}
         T::clone(&self[1.d(self.len())-1])
     }
 }
@@ -209,9 +212,12 @@ where T: Clone
 {
     type Output = T;
     /// Get a random item from some vector.
+    /// 
+    /// # Panic
+    /// An empty `HashSet` will cause a panic.
     fn random_of(&self) -> Self::Output {
-        if self.is_empty() { panic!("Nee-neer - pointing finger at dev(s). Empty HashSet - can't pick a random from that. Anyway… Ta-ta 'til that's fixed.")}
-        let Some(ent) = self.iter().nth(rand::rng().random_range(0..self.len())) else {
+        if self.is_empty() { panic!("Empty HashSet - can't pick a random from that. Anyway… Ta-ta 'til that's fixed.")}
+        let Some(ent) = self.iter().nth((1_usize.d(self.len()) - 1) as usize) else {
             panic!("For some reason the HashSet has less entries in it than .len() suggests?!");
         };
         T::clone(ent)
@@ -292,8 +298,8 @@ mod engine {
             pub(crate) static [<REACTOR_ $t:upper _WARMED>]: AtomicBool = AtomicBool::new(false);
         })+};
     }
-    macro_rules! implement_chaos_engine_struct {
-        (for $($t:ty),+) => {$(paste! {
+    macro_rules! core_chaos_engine_struct {
+        ($t:ty, $u:ty) => {paste!{
             pub(crate) struct [<ChaosEngine $t>] {
                 state: UnsafeCell<$t>,
             }
@@ -311,12 +317,23 @@ mod engine {
                         let ptr = self.state.get();
                         let next = (*ptr).wrapping_mul([<CE_CRNG_ $t:upper _MUL>]).wrapping_add([<CE_CRNG_ $t:upper _ADD>]);
                         *ptr = next;
-                        (next % max) + 1
+                        let unext = next as $u;
+                        let umax = max as $u;
+                        ((unext % umax) + 1) as $t
                     }
                 }
             }
 
             pub(crate) static [<GLOBAL_REACTOR_ $t:upper>]: [<ChaosEngine $t>] = [<ChaosEngine $t>]::new([<CE_CRNG_ $t:upper _INIT>]);
+        }};
+    }
+    macro_rules! implement_chaos_engine_struct {
+        (for $($t:ty => $u:ty),+) => {$(paste! {
+            core_chaos_engine_struct!($t, $u);
+        })+};
+
+        (for $($t:ty),+) => {$(paste! {
+            core_chaos_engine_struct!($t, $t);
         })+};
     }
 
@@ -334,7 +351,14 @@ mod engine {
         [u128, 131, 22695477 as u128, 1],
         [usize, 747, 6364136223846793005, 1442695040888963407]
     );
-    implement_chaos_engine_struct!(for i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
+    implement_chaos_engine_struct!(for
+        i8 => u8,
+        i16 => u16,
+        i32 => u32,
+        i64 => u64,
+        i128 => u128,
+        isize => usize);
+    implement_chaos_engine_struct!(for u8, u16, u32, u64, u128, usize);
 }
 
 macro_rules! implement_diceext {

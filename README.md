@@ -58,3 +58,8 @@ let abc = vec![Abc{tag:"a".into()}, Abc{tag:"b".into()}, Abc{tag:"c".into()}];
 let x = abc.random_of();
 assert!(x.tag == "a" || x.tag == "b" || x.tag == "c");
 ```
+
+## Technobabble
+
+***dicebag*** isn't a PRNG, and it's not CRNG either. It's Chaos-RNG.
+It by nature is meant to produce random values which cannot be reproduced.

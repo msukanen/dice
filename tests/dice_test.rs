@@ -14,7 +14,7 @@ fn d6_stay_in_range() {
 fn d97_stay_in_range() {
     for _ in 0..10_000 {
         let d = 1.d(97);
-        assert!(d >= 1 && d <= 97);
+        assert!(d >= 1 && d <= 97, "d = {}", d);
     }
 }
 
