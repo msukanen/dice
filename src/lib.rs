@@ -380,8 +380,9 @@ macro_rules! implement_diceext {
         /// Throw given `num` of dice, each with x `sides`.
         fn [<any _ $t>](num: $t, sides: usize) -> $t {
             if engine::[<REACTOR_ $t:upper _WARMED>].compare_exchange(false, true, std::sync::atomic::Ordering::Relaxed, std::sync::atomic::Ordering::Relaxed).is_ok() {
+                let mut rng = rand::rng();
                 for _ in 0..13 {
-                    let churn = rand::random::<u64>();
+                    let churn = rng.random::<u64>();
                     engine::[<GLOBAL_REACTOR_ $t:upper>].roll(churn as $t);
                 }
             }
