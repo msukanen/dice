@@ -2,7 +2,7 @@
 name = "dicebag"
 version = "0.3.20"
 edition = "2024"
-description = "Dice rolling!"
+description = "Chaotic dice rolling!"
 license = "MIT OR Apache-2.0"
 authors = ["Markku Sukanen <markku.sukanen@gmail.com>"]
 repository = "https://github.com/msukanen/dice.git"
