@@ -315,7 +315,10 @@ mod engine {
                     if max == 0 { return 0; }
                     unsafe {
                         let ptr = self.state.get();
-                        let next = (*ptr).wrapping_mul([<CE_CRNG_ $t:upper _MUL>]).wrapping_add([<CE_CRNG_ $t:upper _ADD>]);
+                        let next = (*ptr)
+                            .wrapping_mul([<CE_CRNG_ $t:upper _MUL>])
+                            .wrapping_add([<CE_CRNG_ $t:upper _ADD>])
+                            ^ max as $t;
                         *ptr = next;
                         let unext = next as $u;
                         let umax = max as $u;
@@ -357,8 +360,9 @@ mod engine {
         i32 => u32,
         i64 => u64,
         i128 => u128,
-        isize => usize);
-    implement_chaos_engine_struct!(for u8, u16, u32, u64, u128, usize);
+        isize => u64,
+        usize => u64);
+    implement_chaos_engine_struct!(for u8, u16, u32, u64, u128);
 }
 
 macro_rules! implement_diceext {
@@ -381,15 +385,13 @@ macro_rules! implement_diceext {
         fn [<any _ $t>](num: $t, sides: usize) -> $t {
             if engine::[<REACTOR_ $t:upper _WARMED>].compare_exchange(false, true, std::sync::atomic::Ordering::Relaxed, std::sync::atomic::Ordering::Relaxed).is_ok() {
                 let mut rng = rand::rng();
-                for _ in 0..13 {
-                    let churn = rng.random::<u64>();
-                    engine::[<GLOBAL_REACTOR_ $t:upper>].roll(churn as $t);
+                for _ in 0..(rng.random::<u8>()).max(13) {
+                    engine::[<GLOBAL_REACTOR_ $t:upper>].roll(sides as $t);
                 }
             }
             let mut result: $t = 0;
             let reverse = [<dicelt0 _ $t>](num);
             for _ in 0..[<diceabs _ $t>](num) {
-                //result += rng.random_range(1..=(sides as $t));
                 result += engine::[<GLOBAL_REACTOR_ $t:upper>].roll(sides as $t);
             }
             if reverse {[<dicerev _ $t>](result)} else {result}
