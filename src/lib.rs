@@ -168,7 +168,12 @@ impl InclusiveRandomRange<i32> for std::ops::RangeInclusive<i32> {
         if start > end {
             std::mem::swap(&mut start, &mut end);
         }
-        rand::rng().random_range(start..=end)
+        let start = start as i64;
+        let end = end as i64;
+        let sides = end - start + 1;
+        // engine.roll(X) gives 1..=X value. Shift it down.
+        (start + (engine::GLOBAL_REACTOR_I64.roll(sides) - 1)) as i32
+        // rand::rng().random_range(start..=end)
     }
 }
 
@@ -176,7 +181,23 @@ impl InclusiveRandomRange<f64> for std::ops::RangeInclusive<f64> {
     fn random_of(&self) -> f64 {
         let (mut start, mut end) = (*self.start(), *self.end());
         if start > end { std::mem::swap(&mut start, &mut end); }// swap endpoints if needed…
-        rand::rng().random_range(start..=end)
+
+        let raw_bits = engine::GLOBAL_REACTOR_U64.roll(u64::MAX);
+        let max_m = (1u64 << 53) - 1; // use 53 bits of mantissa of the f64
+        start + ((raw_bits & max_m) as f64 / max_m as f64) * (end - start)
+        // rand::rng().random_range(start..=end)
+    }
+}
+
+impl InclusiveRandomRange<f32> for std::ops::RangeInclusive<f32> {
+    fn random_of(&self) -> f32 {
+        let (mut start, mut end) = (*self.start(), *self.end());
+        if start > end { std::mem::swap(&mut start, &mut end); }// swap endpoints if needed…
+
+        let raw_bits = engine::GLOBAL_REACTOR_U64.roll(u64::MAX);
+        let max_m = (1u32 << 24) - 1; // use 24 bits of mantissa of the f32
+        start + ((raw_bits as u32 & max_m) as f32 / max_m as f32) * (end - start)
+        // rand::rng().random_range(start..=end)
     }
 }
 
@@ -184,7 +205,18 @@ impl InclusiveRandomRange<char> for std::ops::RangeInclusive<char> {
     fn random_of(&self) -> char {
         let (mut start, mut end) = (*self.start(), *self.end());
         if start > end { std::mem::swap(&mut start, &mut end); }// swap endpoints if needed…
-        rand::rng().random_range(start..=end)
+        
+        let u_start = start as u32;
+        let u_end = end as u32;
+        let range = u_end - u_start + 1;
+        loop {
+            let offt = engine::GLOBAL_REACTOR_U32.roll(range);
+            let maybe = u_start + offt;
+            // skip the illegal surrogate gap
+            if !(0xD800..=0xDFFF).contains(&maybe) {
+                return unsafe { char::from_u32_unchecked(maybe) }
+            }
+        }
     }
 }
 
@@ -225,10 +257,10 @@ where T: Clone
 }
 
 /// Take a number and alter it by up to (or less, of course) ±X%.
-fn jitter_perc<T: Float + ToPrimitive>(original: &T, percentage: f64) -> T {
-    let p = 0.01 * percentage;
-    *original * NumCast::from(1.0 + rand::rng().random_range(-p..=p)).unwrap()
-}
+// fn jitter_perc<T: Float + ToPrimitive>(original: &T, percentage: f64) -> T {
+//     let p = 0.01 * percentage;
+//     *original * NumCast::from(1.0 + rand::rng().random_range(-p..=p)).unwrap()
+// }
 
 #[macro_export]
 /// Roll some arbitrary dice and see if their result is "low".
@@ -331,7 +363,7 @@ mod engine {
                 pub fn core_chaos_engine_struct_clobber(&self) {
                     unsafe {
                         let ptr = self.state.get();
-                        *ptr = (*ptr).wrapping_add([<CE_CRNG_ $t:upper _MUL>]).wrapping_add(13);
+                        *ptr = (*ptr).wrapping_add([<CE_CRNG_ $t:upper _MUL>]).wrapping_add(13 as $t);
                     }
                 }
             }
@@ -427,23 +459,30 @@ macro_rules! implement_diceext {
 }
 
 macro_rules! implement_float_diceext {
-    ( for $($t:ty),+) => {
+    ( for $($t:ty),+) => {paste!{
         $(
             impl FixedNumberVariance<$t> for $t {
                 fn upto_delta(&self, upto: Self) -> Self {self.jitter_within(upto)}
                 fn jitter_within(&self, upto: Self) -> Self {
-                    self + rand::rng().random_range(-upto..=upto)
+                    if upto <= 0.0 { return *self; }
+                    let raw_bits = engine::GLOBAL_REACTOR_U64.roll(u64::MAX);
+                    let scale = (raw_bits & (([<$t>]::MANTISSA_DIGITS as u64) -1)) as $t
+                                / (([<$t>]::MANTISSA_DIGITS as u64) - 1) as $t;
+                    self + ((scale * 2.0 * upto ) - upto)
                 }
             }
 
             impl PercentageVariance for $t {
                 fn delta(&self, percentage: i32) -> Self { self.jitter_percentage(percentage as f64) }
                 fn jitter_percentage(&self, percentage: f64) -> Self {
-                    jitter_perc::<Self>(self, percentage)
+                    let p = 0.01 * percentage;
+                    let upto = self.abs() * p as $t;
+                    self.jitter_within(upto)
+                    // jitter_perc::<Self>(self, percentage)
                 }
             }
         )+
-    };
+    }};
 }
 
 implement_diceext!(for i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
