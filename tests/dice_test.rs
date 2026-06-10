@@ -1,6 +1,7 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, thread};
 
 use dicebag::*;
+use serde::Deserialize;
 
 /// See that D6 rolls stay within range.
 #[test]
@@ -56,20 +57,34 @@ fn random_of_f64() {
     }
 }
 
-// #[test]
-// fn random_u32() {
-//     _ = env_logger::try_init();
-//     let r = 1.d6();
-//     log::debug!("r = {r}");
-// }
+#[test]
+fn dice_roll_modifiers() {
+    let json = r#"{
+        "something": [1, 10, { "add": 2 }]
+    }"#;
 
-// #[test]
-// fn rand_rng() {
-//     use rand::RngExt;
-//     _ = env_logger::try_init();
-//     let mut rng = rand::rng();
-//     for i in 0..5 {
-//         let v = rng.random::<u64>();
-//         log::debug!("churn[{i}] = {v}");
-//     }
-// }
+    #[derive(Deserialize)]
+    struct Something {
+        something: DiceRollMatrix,
+    }
+
+    let s = match serde_json::from_str::<Something>(json) {
+        Ok(s) => s,
+        Err(e) => panic!("{e:?}")
+    };
+
+    let mut old_roll = 0;
+    let mut repeats = 0;
+    _ = env_logger::try_init();
+    for _ in 0..10_000 {
+        let r = s.something.roll();
+        log::debug!("r = {r}");
+        if old_roll == r {
+            repeats += 1;
+        }
+        old_roll = r;
+        assert!(r >= 3 && r <= 12, "Roll of {r} is out of bounds of [3..=12]!");
+    }
+
+    log::debug!("Repeats: {repeats} out of 10,000")
+}

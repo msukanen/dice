@@ -59,10 +59,96 @@
 use std::collections::HashSet;
 
 use rand::RngExt;
-use num::{ Float, Integer, NumCast, ToPrimitive };
+use num::{ Float, Integer };
 use paste::paste;
+use serde::{Deserialize, Serialize, de::{MapAccess, Visitor, Error}};
 
 pub type DiceT = (i32,i32);
+
+/// Dice roll matrix mod for e.g. serde parsing, etc.
+#[derive(Debug, Clone, Copy, Serialize)]
+pub enum DiceRollMatrixMod {
+    Add(u8),
+    /// `Div` ignores decimals entirely.
+    Div(u8),
+    /// `DivUp` "rounds" upward if dividing ends up with decimals.
+    DivUp(u8),
+    Mul(u8),
+    Sub(u8),
+}
+
+impl <'de> Deserialize<'de> for DiceRollMatrixMod {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where D: serde::Deserializer<'de>
+    {
+        struct ModVis;
+        impl<'de> Visitor<'de> for ModVis {
+            type Value = DiceRollMatrixMod;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a case-insensitive dice modifier thingy")
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where A: MapAccess<'de>,
+            {
+                if let Some((key, value)) = map.next_entry::<String, u8>()? {
+                    match key.to_lowercase().as_str() {
+                        "add" => Ok(DiceRollMatrixMod::Add(value)),
+                        "div" => Ok(DiceRollMatrixMod::Div(value)),
+                        "divup"|"div_up" => Ok(DiceRollMatrixMod::DivUp(value)),
+                        "mul" => Ok(DiceRollMatrixMod::Mul(value)),
+                        "sub" => Ok(DiceRollMatrixMod::Sub(value)),
+                        _ => Err(A::Error::unknown_field(&key, &["add","div","divup","div_up","mul","sub"]))
+                    }
+                } else {
+                    Err(A::Error::custom("empty modifier thingy"))
+                }
+            }
+        }
+
+        deserializer.deserialize_map(ModVis)
+    }
+}
+
+trait DiceRollMatrixModifier {
+    fn drmm(&self, drmm: DiceRollMatrixMod) -> i32;
+}
+
+impl DiceRollMatrixModifier for i32 {
+    fn drmm(&self, drmm: DiceRollMatrixMod) -> i32 {
+        match drmm {
+            DiceRollMatrixMod::Add(v) => self + v as i32,
+            DiceRollMatrixMod::Div(v) => self / v as i32,
+            DiceRollMatrixMod::DivUp(v) => {
+                let v = v as i32;
+                (self + v - 1) / v
+            }
+            DiceRollMatrixMod::Mul(v) => self * v as i32,
+            DiceRollMatrixMod::Sub(v) => self - v as i32,
+        }
+    }
+}
+
+/// Dice roll matrix for e.g. serde parsing, etc.
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum DiceRollMatrix {
+    Single(u8),
+    Multi(u8, u8),
+    MultiWithMod(u8, u8, DiceRollMatrixMod)
+}
+
+impl DiceRollMatrix {
+    pub fn roll(&self) -> i32 {
+        match self {
+            Self::Single(sides) => 1.d(*sides as usize) as i32,
+            Self::Multi(num, sides) => (*num).d(*sides as usize) as i32,
+            Self::MultiWithMod(num, sides, drmm) =>
+                Self::Multi(*num, *sides).roll().drmm(*drmm)
+        }
+    }
+}
 
 /// Dice extensions.
 /// 
