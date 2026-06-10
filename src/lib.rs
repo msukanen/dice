@@ -314,15 +314,24 @@ mod engine {
                 pub fn roll(&self, max: $t) -> $t {
                     if max == 0 { return 0; }
                     unsafe {
+                        let stack_entropy = &max as *const $t as usize;
                         let ptr = self.state.get();
                         let next = (*ptr)
                             .wrapping_mul([<CE_CRNG_ $t:upper _MUL>])
                             .wrapping_add([<CE_CRNG_ $t:upper _ADD>])
-                            ^ max as $t;
+                            ^ (max as $t)
+                            ^ (stack_entropy as $t);
                         *ptr = next;
                         let unext = next as $u;
                         let umax = max as $u;
                         ((unext % umax) + 1) as $t
+                    }
+                }
+
+                pub fn core_chaos_engine_struct_clobber(&self) {
+                    unsafe {
+                        let ptr = self.state.get();
+                        *ptr = (*ptr).wrapping_add([<CE_CRNG_ $t:upper _MUL>]).wrapping_add(13);
                     }
                 }
             }
@@ -388,11 +397,18 @@ macro_rules! implement_diceext {
                 for _ in 0..(rng.random::<u8>()).max(13) {
                     engine::[<GLOBAL_REACTOR_ $t:upper>].roll(sides as $t);
                 }
+                std::thread::spawn(|| {
+                    let sleep_dur = std::time::Duration::from_micros(50);
+                    loop {
+                        std::hint::black_box(engine::[<GLOBAL_REACTOR_ $t:upper>].core_chaos_engine_struct_clobber());
+                        std::thread::sleep(sleep_dur);
+                    }
+                });
             }
             let mut result: $t = 0;
             let reverse = [<dicelt0 _ $t>](num);
             for _ in 0..[<diceabs _ $t>](num) {
-                result += engine::[<GLOBAL_REACTOR_ $t:upper>].roll(sides as $t);
+                result += std::hint::black_box(engine::[<GLOBAL_REACTOR_ $t:upper>].roll(sides as $t));
             }
             if reverse {[<dicerev _ $t>](result)} else {result}
         }
@@ -432,3 +448,73 @@ macro_rules! implement_float_diceext {
 
 implement_diceext!(for i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
 implement_float_diceext!(for f32, f64);//f128 unstable at time of writing... July 6, 2025.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::thread;
+    use std::time::Duration;
+
+    #[test]
+    fn test_dicebag_is_completely_non_deterministic() {
+        // seq of 100 dice rolls (with d10000 for high variancy)
+        let sample_size = 100;
+        let sides = 10_000;
+        
+        // 1st seq
+        let mut seq_a = Vec::with_capacity(sample_size);
+        for _ in 0..sample_size {
+            seq_a.push(1_i32.d(sides));
+            // snooze a moment
+            thread::sleep(Duration::from_micros(10));
+        }
+
+        // 2nd seq
+        let mut seq_b = Vec::with_capacity(sample_size);
+        for _ in 0..sample_size {
+            seq_b.push(1_i32.d(sides));
+            thread::sleep(Duration::from_micros(10));
+        }
+
+        // assert_eq!(seq_a.len(), seq_b.len());
+
+        // how many elements match at the same index?
+        let mut matches = 0;
+        for i in 0..sample_size {
+            if seq_a[i] == seq_b[i] {
+                matches += 1;
+            }
+        }
+
+        // with 10k sides, back-to-back mirrors are statistically a farce.
+        // Matches should be near zero. If they aren't, the machine lied to us!
+        println!("Identical rolls at matching positions: {}/{}", matches, sample_size);
+        assert!(
+            matches < (sample_size / 10), 
+            "Sequences are too similar! We have a determinist amongst us!"
+        );
+        
+        assert_ne!(seq_a, seq_b, "Something gone really, really wrong - seq B perfectly mirrored A!");
+    }
+
+    #[test]
+    fn test_concurrent_clobbering() {
+        // Pester the engine from all directions to make sure it mangles
+        // output without screaming in panic, deadlocking, or having any
+        // other dreadful issues …
+        let mut handles = vec![];
+        
+        for _ in 0..8 {
+            handles.push(thread::spawn(|| {
+                for _ in 0..50 {
+                    let roll = 1_i64.d(100);
+                    assert!(roll >= 1 && roll <= 100);
+                }
+            }));
+        }
+
+        for handle in handles {
+            handle.join().unwrap();
+        }
+    }
+}
