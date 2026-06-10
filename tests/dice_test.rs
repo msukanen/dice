@@ -78,7 +78,7 @@ fn dice_roll_modifiers() {
     _ = env_logger::try_init();
     for _ in 0..10_000 {
         let r = s.something.roll();
-        log::debug!("r = {r}");
+        // log::debug!("r = {r}");
         if old_roll == r {
             repeats += 1;
         }
