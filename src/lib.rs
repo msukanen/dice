@@ -157,7 +157,13 @@ impl DiceRollMatrix {
 
 impl From<i32> for DiceRollMatrix {
     fn from(value: i32) -> Self {
-        Self::Exact { value: value.max(0).min(u8::MAX as i32) as u8 }
+        Self::from(value.max(0).min(u8::MAX as i32) as u8)
+    }
+}
+
+impl From<u8> for DiceRollMatrix {
+    fn from(value: u8) -> Self {
+        Self::Exact { value }
     }
 }
 
