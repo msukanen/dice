@@ -58,7 +58,6 @@
 //! 
 use std::collections::HashSet;
 
-use rand::RngExt;
 use num::{ Float, Integer };
 use paste::paste;
 use serde::{Deserialize, Serialize, de::{Error, MapAccess, SeqAccess, Visitor}, ser::{SerializeSeq, SerializeStruct}};
@@ -653,8 +652,12 @@ macro_rules! implement_diceext {
         /// Throw given `num` of dice, each with x `sides`.
         fn [<any _ $t>](num: $t, sides: usize) -> $t {
             if engine::[<REACTOR_U $bits _WARMED>].compare_exchange(false, true, std::sync::atomic::Ordering::Relaxed, std::sync::atomic::Ordering::Relaxed).is_ok() {
-                let mut rng = rand::rng();
-                for _ in 0..(rng.random::<u8>()).max(13) {
+                // chaos seed
+                let x = std::time::Instant::now();
+                let ptr = &x as *const _ as u64;
+                let b = std::time::Instant::now().elapsed().as_nanos() as u64;
+                let z = ptr ^ b.rotate_left(7);
+                for _ in 0..(z.rotate_left((ptr & 0xF) as u32)).wrapping_rem(512).max(128) {
                     engine::[<GLOBAL_REACTOR_U $bits>].roll(sides as [<u $bits>]);
                 }
                 std::thread::spawn(|| {
