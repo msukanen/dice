@@ -155,6 +155,12 @@ impl DiceRollMatrix {
     }
 }
 
+impl From<i32> for DiceRollMatrix {
+    fn from(value: i32) -> Self {
+        Self::Exact { value: value.max(0).min(u8::MAX as i32) as u8 }
+    }
+}
+
 impl <'de> Deserialize<'de> for DiceRollMatrix {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
