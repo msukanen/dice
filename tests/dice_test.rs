@@ -1,4 +1,4 @@
-use std::{collections::HashSet, thread};
+use std::{clone, collections::HashSet};
 
 use dicebag::*;
 use serde::Deserialize;
@@ -87,4 +87,95 @@ fn dice_roll_modifiers() {
     }
 
     log::debug!("Repeats: {repeats} out of 10,000")
+}
+
+#[test]
+fn chance_50perc() {
+    let c = DiceRollMatrix::Chance(50, Box::new(DiceRollMatrix::Exact { value: 1 }));
+    let mut ones = 0;
+    for _ in 0..100_000 {
+        if c.roll() == 1 {
+            ones += 1;
+        }
+    }
+    assert!(ones >= 45000 && ones <= 55000, "Strange number of ones: {ones}; expected 4.5–5.5 mid range");
+}
+
+#[test]
+fn drm_roundtrip_exact_flat() {
+    let json = "5";
+    let drm: DiceRollMatrix = serde_json::from_str(json).unwrap();
+    assert!(matches!(drm, DiceRollMatrix::Exact { value: 5 }));
+
+    let ser = serde_json::to_string(&drm).unwrap();
+    let drm2: DiceRollMatrix = serde_json::from_str(&ser).unwrap();
+    assert_eq!(drm2, drm);
+}
+
+#[test]
+fn drm_roundtrip_exact_struct() {
+    let json = r#"{ "value": 7 }"#;
+    let drm: DiceRollMatrix = serde_json::from_str(json).unwrap();
+    assert!(matches!(drm, DiceRollMatrix::Exact { value: 7 }));
+
+    let ser = serde_json::to_string(&drm).unwrap();
+    let drm2: DiceRollMatrix = serde_json::from_str(&ser).unwrap();
+    assert_eq!(drm2, drm);
+}
+
+#[test]
+fn drm_roundtrip_percentage() {
+    let json = r#""25%""#;
+    let drm: DiceRollMatrix = serde_json::from_str(json).unwrap();
+    assert!(matches!(drm, DiceRollMatrix::Percentage(25)));
+
+    let ser = serde_json::to_string(&drm).unwrap();
+    let drm2: DiceRollMatrix = serde_json::from_str(&ser).unwrap();
+    assert_eq!(drm2, drm);
+}
+
+#[test]
+fn drm_roundtrip_multi() {
+    let json = "[3, 6]";
+    let drm: DiceRollMatrix = serde_json::from_str(json).unwrap();
+    assert!(matches!(drm, DiceRollMatrix::Multi(3, 6)));
+
+    let ser = serde_json::to_string(&drm).unwrap();
+    let drm2: DiceRollMatrix = serde_json::from_str(&ser).unwrap();
+    assert_eq!(drm2, drm);
+}
+
+#[test]
+fn drm_roundtrip_multi_with_mod() {
+    let json = r#"[3, 6, { "add": 2 }]"#;
+    let drm: DiceRollMatrix = serde_json::from_str(json).unwrap();
+    assert!(matches!(drm, DiceRollMatrix::MultiWithMod(3, 6, DiceRollMatrixMod::Add(2))));
+
+    let ser = serde_json::to_string(&drm).unwrap();
+    let drm2: DiceRollMatrix = serde_json::from_str(&ser).unwrap();
+    assert_eq!(drm2, drm);
+}
+
+#[test]
+fn drm_roundtrip_chance() {
+    let json = r#"{ "chance": [50, { "value": 3 }] }"#;
+    let drm: DiceRollMatrix = serde_json::from_str(json).unwrap();
+    assert!(
+        matches!(&drm, DiceRollMatrix::Chance(50, inner)
+            if matches!(**inner, DiceRollMatrix::Exact { value: 3 }))
+    );
+
+    let ser = serde_json::to_string(&drm).unwrap();
+    let drm2: DiceRollMatrix = serde_json::from_str(&ser).unwrap();
+    assert_eq!(drm2, drm);
+}
+
+#[test]
+fn drm_roundtrip_nested_chance() {
+    let json = r#"{ "chance": [40, { "chance": [20, { "value": 9 }] }] }"#;
+    let drm: DiceRollMatrix = serde_json::from_str(json).unwrap();
+
+    let ser = serde_json::to_string(&drm).unwrap();
+    let drm2: DiceRollMatrix = serde_json::from_str(&ser).unwrap();
+    assert_eq!(drm2, drm);
 }

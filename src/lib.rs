@@ -61,12 +61,12 @@ use std::collections::HashSet;
 use rand::RngExt;
 use num::{ Float, Integer };
 use paste::paste;
-use serde::{Deserialize, Serialize, de::{MapAccess, Visitor, Error}};
+use serde::{Deserialize, Serialize, de::{Error, MapAccess, SeqAccess, Visitor}, ser::{SerializeSeq, SerializeStruct}};
 
 pub type DiceT = (i32,i32);
 
 /// Dice roll matrix mod for e.g. serde parsing, etc.
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 pub enum DiceRollMatrixMod {
     Add(u8),
     /// `Div` ignores decimals entirely.
@@ -131,10 +131,11 @@ impl DiceRollMatrixModifier for i32 {
 }
 
 /// Dice roll matrix for e.g. serde parsing, etc.
-#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
-#[serde(untagged)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DiceRollMatrix {
-    Single(u8),
+    Exact { value: u8 },
+    Percentage(u8), // de: "123%" -> 123_u8, ser: 123u8 -> "123%"
+    Chance(u8, Box<DiceRollMatrix>),
     Multi(u8, u8),
     MultiWithMod(u8, u8, DiceRollMatrixMod)
 }
@@ -142,10 +143,129 @@ pub enum DiceRollMatrix {
 impl DiceRollMatrix {
     pub fn roll(&self) -> i32 {
         match self {
-            Self::Single(sides) => 1.d(*sides as usize) as i32,
+            Self::Exact { value } => *value as i32,
             Self::Multi(num, sides) => (*num).d(*sides as usize) as i32,
             Self::MultiWithMod(num, sides, drmm) =>
-                Self::Multi(*num, *sides).roll().drmm(*drmm)
+                Self::Multi(*num, *sides).roll().drmm(*drmm),
+            Self::Percentage(p) => if 1.d100() <= *p { 1 } else { 0 },
+            Self::Chance(p, drm) =>
+                if 1.d100() > *p { 0 }
+                else { drm.roll() },
+        }
+    }
+}
+
+impl <'de> Deserialize<'de> for DiceRollMatrix {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>
+    {
+        struct DRMVis;
+        impl <'de> Visitor<'de> for DRMVis {
+            type Value = DiceRollMatrix;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("dice roll matrix thingy")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where E: Error,
+            {
+                if let Some(percstr) = v.strip_suffix('%') {
+                    let n = percstr.parse::<u8>().map_err(E::custom)?;
+                    return Ok(DiceRollMatrix::Percentage(n));
+                }
+                Err(E::custom(format!("'{v}' is an invalid string from DiceRollMatrix")))
+            }
+
+            fn visit_u64<E>(self, v: u64) -> Result<Self::Value, E>
+            where E: Error,
+            {
+                if v <= u8::MAX as u64 {
+                    Ok(DiceRollMatrix::Exact { value: v as u8 })
+                } else {
+                    Err(E::custom(format!("'{v}' is too large for u8")))
+                }
+            }
+
+            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
+            where A: MapAccess<'de>,
+            {
+                let (key, raw): (String, serde_json::Value) =
+                    map.next_entry()?.ok_or_else(|| A::Error::custom("expceted a single-field object"))?;
+
+                match key.as_str() {
+                    "value" => {
+                        let v: u8 = serde_json::from_value(raw).map_err(A::Error::custom)?;
+                        Ok(DiceRollMatrix::Exact { value: v })
+                    }
+
+                    "chance" => {
+                        // expect: [pct, <DiceRollMatrix>]
+                        let arr: Vec<serde_json::Value> = serde_json::from_value(raw).map_err(A::Error::custom)?;
+                        if arr.len() != 2 {
+                            return Err(A::Error::custom("chance must be [pct, matrix]"));
+                        }
+
+                        let pct: u8 = serde_json::from_value(arr[0].clone()).map_err(A::Error::custom)?;
+                        let inner: DiceRollMatrix = serde_json::from_value(arr[1].clone()).map_err(A::Error::custom)?;
+                        Ok(DiceRollMatrix::Chance(pct, Box::new(inner)))
+                    }
+
+                    _ => Err(A::Error::custom(format!("unknown offender '{key}' in DiceRollMatrix")))
+                }
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where A: SeqAccess<'de>,
+            {
+                let a: u8 = seq.next_element()?.ok_or_else(|| A::Error::custom("missing 1st element"))?;
+                let b: u8 = seq.next_element()?.ok_or_else(|| A::Error::custom("missing 2nd element"))?;
+                if let Some(modf) = seq.next_element::<DiceRollMatrixMod>()? {
+                    Ok(DiceRollMatrix::MultiWithMod(a,b,modf))
+                } else {
+                    Ok(DiceRollMatrix::Multi(a,b))
+                }
+            }
+        }
+
+        deserializer.deserialize_any(DRMVis)
+    }
+}
+
+impl Serialize for DiceRollMatrix {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where S: serde::Serializer
+    {
+        match self {
+            Self::Exact { value } => {
+                let mut st = serializer.serialize_struct("Exact", 1)?;
+                st.serialize_field("value", value)?;
+                st.end()
+            }
+
+            Self::Multi(a,b) => {
+                let mut seq = serializer.serialize_seq(Some(2))?;
+                seq.serialize_element(a)?;
+                seq.serialize_element(b)?;
+                seq.end()
+            }
+
+            Self::MultiWithMod(a,b,m) => {
+                let mut seq = serializer.serialize_seq(Some(3))?;
+                seq.serialize_element(a)?;
+                seq.serialize_element(b)?;
+                seq.serialize_element(m)?;
+                seq.end()
+            }
+
+            Self::Percentage(p) => serializer.serialize_str(&format!("{p}%")),
+
+            Self::Chance(p, drm) => {
+                let mut st = serializer.serialize_struct("Chance", 1)?;
+                st.serialize_field("chance", &(p, drm))?;
+                st.end()
+            }
         }
     }
 }
@@ -258,7 +378,7 @@ impl InclusiveRandomRange<i32> for std::ops::RangeInclusive<i32> {
         let end = end as i64;
         let sides = end - start + 1;
         // engine.roll(X) gives 1..=X value. Shift it down.
-        (start + (engine::GLOBAL_REACTOR_I64.roll(sides) - 1)) as i32
+        (start + (engine::GLOBAL_REACTOR_U64.roll(sides as u64) - 1) as i64) as i32
         // rand::rng().random_range(start..=end)
     }
 }
@@ -296,7 +416,7 @@ impl InclusiveRandomRange<char> for std::ops::RangeInclusive<char> {
         let u_end = end as u32;
         let range = u_end - u_start + 1;
         loop {
-            let offt = engine::GLOBAL_REACTOR_U32.roll(range);
+            let offt = engine::GLOBAL_REACTOR_U64.roll(range as u64) as u32;
             let maybe = u_start + offt;
             // skip the illegal surrogate gap
             if !(0xD800..=0xDFFF).contains(&maybe) {
@@ -409,15 +529,15 @@ mod engine {
     use paste::paste;
 
     macro_rules! const_chaos_engine_crng_vals {
-        (for $([$t:ty, $init:literal, $mul:expr, $add:literal]),+) => {$(paste! {
-            const [<CE_CRNG_ $t:upper _INIT>]: $t = $init;
-            const [<CE_CRNG_ $t:upper _MUL>]: $t = $mul;
-            const [<CE_CRNG_ $t:upper _ADD>]: $t = $add;
-            pub(crate) static [<REACTOR_ $t:upper _WARMED>]: AtomicBool = AtomicBool::new(false);
+        (for $([$t:ty, $bits:literal bits, $init:literal, $mul:expr, $add:literal]),+ $(,)?) => {$(paste! {
+            const [<CE_CRNG_U $bits _INIT>]: $t = $init;
+            const [<CE_CRNG_U $bits _MUL>]: $t = $mul;
+            const [<CE_CRNG_U $bits _ADD>]: $t = $add;
+            pub(crate) static [<REACTOR_U $bits _WARMED>]: AtomicBool = AtomicBool::new(false);
         })+};
     }
     macro_rules! core_chaos_engine_struct {
-        ($t:ty, $u:ty) => {paste!{
+        ($t:ty, $u:ty, $bits:literal) => {paste!{
             pub(crate) struct [<ChaosEngine $t>] {
                 state: UnsafeCell<$t>,
             }
@@ -432,68 +552,78 @@ mod engine {
                 pub fn roll(&self, max: $t) -> $t {
                     if max == 0 { return 0; }
                     unsafe {
-                        let stack_entropy = &max as *const $t as usize;
+                        let stack_entropy = &max as *const $t as usize as [<u $bits>];
                         let ptr = self.state.get();
-                        let next = (*ptr)
-                            .wrapping_mul([<CE_CRNG_ $t:upper _MUL>])
-                            .wrapping_add([<CE_CRNG_ $t:upper _ADD>])
-                            ^ (max as $t)
-                            ^ (stack_entropy as $t);
-                        *ptr = next;
-                        let unext = next as $u;
-                        let umax = max as $u;
-                        ((unext % umax) + 1) as $t
+                        let next = (*ptr as [<u $bits>])
+                            .wrapping_mul([<CE_CRNG_U $bits _MUL>])
+                            .wrapping_add([<CE_CRNG_U $bits _ADD>])
+                            ^ (max as [<u $bits>])
+                            ^ stack_entropy
+                            ^ {
+                                let inst = std::time::Instant::now();
+                                &inst as *const _ as usize as [<u $bits>]
+                            }
+                            ;
+                        *ptr = next as $t;
+                        ((next % (max as [<u $bits>])) + 1) as $t
                     }
                 }
 
-                pub fn core_chaos_engine_struct_clobber(&self) {
+                pub fn core_chaos_engine_struct_clobber_(&self) {
                     unsafe {
                         let ptr = self.state.get();
-                        *ptr = (*ptr).wrapping_add([<CE_CRNG_ $t:upper _MUL>]).wrapping_add(13 as $t);
+                        *ptr = (*ptr as [<u $bits>]).wrapping_add([<CE_CRNG_U $bits _MUL>]).wrapping_add(13) as $t;
                     }
                 }
             }
 
-            pub(crate) static [<GLOBAL_REACTOR_ $t:upper>]: [<ChaosEngine $t>] = [<ChaosEngine $t>]::new([<CE_CRNG_ $t:upper _INIT>]);
+            pub(crate) static [<GLOBAL_REACTOR_U $bits>]: [<ChaosEngine $t>] = [<ChaosEngine $t>]::new([<CE_CRNG_U $bits _INIT>]);
         }};
     }
     macro_rules! implement_chaos_engine_struct {
-        (for $($t:ty => $u:ty),+) => {$(paste! {
-            core_chaos_engine_struct!($t, $u);
-        })+};
+        // (for $($t:ty => $u:ty),+ $(,)?) => {$(paste! {
+        //     core_chaos_engine_struct!($t, $u);
+        // })+};
 
-        (for $($t:ty),+) => {$(paste! {
-            core_chaos_engine_struct!($t, $t);
+        (for $(($t:ty, $bits:literal bits)),+ $(,)?) => {$(paste! {
+            core_chaos_engine_struct!($t, $t, $bits);
         })+};
     }
 
     const_chaos_engine_crng_vals!(for
-        [i8, 9, 85, 33],
-        [i16, 17, 25173, 13849],
-        [i32, 33, 1664525, 1013904223],
-        [i64, 65, 6364136223846793005, 1442695040888963407],
-        [i128, 129, 22695477 as i128, 1],
-        [isize, 321, 6364136223846793005, 1442695040888963407],
-        [u8, 11, 85, 33],
-        [u16, 19, 25173, 13849],
-        [u32, 35, 1664525, 1013904223],
-        [u64, 67, 6364136223846793005, 1442695040888963407],
-        [u128, 131, 22695477 as u128, 1],
-        [usize, 747, 6364136223846793005, 1442695040888963407]
+        // [i8, 9, 85, 33],
+        // [i16, 17, 25173, 13849],
+        // [i32, 33, 1664525, 1013904223],
+        // [i64, 65, 6364136223846793005, 1442695040888963407],
+        // [i128, 129, 22695477 as i128, 1],
+        // [isize, 321, 6364136223846793005, 1442695040888963407],
+        // [u8, 11, 85, 33],
+        // [u16, 19, 25173, 13849],
+        // [u32, 35, 1664525, 1013904223],
+        [u64, 64 bits, 67, 6364136223846793005, 1442695040888963407],
+        [u128, 128 bits, 131, 22695477 as u128, 1],
+        // [usize, 747, 6364136223846793005, 1442695040888963407],
     );
+    // implement_chaos_engine_struct!(for
+        // i8 => u8,
+        // i16 => u16,
+        // i32 => u32,
+        // i64 => u64,
+        // i128 => u128,
+        // isize => u64,
+        // usize => u64
+    // );
     implement_chaos_engine_struct!(for
-        i8 => u8,
-        i16 => u16,
-        i32 => u32,
-        i64 => u64,
-        i128 => u128,
-        isize => u64,
-        usize => u64);
-    implement_chaos_engine_struct!(for u8, u16, u32, u64, u128);
+        // u8,
+        // u16,
+        // u32,
+        (u64, 64 bits),
+        (u128, 128 bits),
+    );
 }
 
 macro_rules! implement_diceext {
-    ( for $($t:ty),+) => {$(paste! {
+    ( for $(($t:ty, $bits:literal bits)),+ $(,)?) => {$(paste! {
         impl DiceExt for $t {
             fn d(&self, sides: usize) -> Self { [<any _ $t>](*self, sides) }
             fn d2(&self) -> Self { [<any _ $t>](*self, 2)}
@@ -510,15 +640,15 @@ macro_rules! implement_diceext {
 
         /// Throw given `num` of dice, each with x `sides`.
         fn [<any _ $t>](num: $t, sides: usize) -> $t {
-            if engine::[<REACTOR_ $t:upper _WARMED>].compare_exchange(false, true, std::sync::atomic::Ordering::Relaxed, std::sync::atomic::Ordering::Relaxed).is_ok() {
+            if engine::[<REACTOR_U $bits _WARMED>].compare_exchange(false, true, std::sync::atomic::Ordering::Relaxed, std::sync::atomic::Ordering::Relaxed).is_ok() {
                 let mut rng = rand::rng();
                 for _ in 0..(rng.random::<u8>()).max(13) {
-                    engine::[<GLOBAL_REACTOR_ $t:upper>].roll(sides as $t);
+                    engine::[<GLOBAL_REACTOR_U $bits>].roll(sides as [<u $bits>]);
                 }
                 std::thread::spawn(|| {
-                    let sleep_dur = std::time::Duration::from_micros(50);
+                    let sleep_dur = std::time::Duration::from_micros(25);
                     loop {
-                        std::hint::black_box(engine::[<GLOBAL_REACTOR_ $t:upper>].core_chaos_engine_struct_clobber());
+                        std::hint::black_box(engine::[<GLOBAL_REACTOR_U $bits>].core_chaos_engine_struct_clobber_());
                         std::thread::sleep(sleep_dur);
                     }
                 });
@@ -526,7 +656,7 @@ macro_rules! implement_diceext {
             let mut result: $t = 0;
             let reverse = [<dicelt0 _ $t>](num);
             for _ in 0..[<diceabs _ $t>](num) {
-                result += std::hint::black_box(engine::[<GLOBAL_REACTOR_ $t:upper>].roll(sides as $t));
+                result += std::hint::black_box(engine::[<GLOBAL_REACTOR_U $bits>].roll(sides as [<u $bits>]) as $t);
             }
             if reverse {[<dicerev _ $t>](result)} else {result}
         }
@@ -564,14 +694,26 @@ macro_rules! implement_float_diceext {
                     let p = 0.01 * percentage;
                     let upto = self.abs() * p as $t;
                     self.jitter_within(upto)
-                    // jitter_perc::<Self>(self, percentage)
                 }
             }
         )+
     }};
 }
 
-implement_diceext!(for i8, i16, i32, i64, i128, isize, u8, u16, u32, u64, u128, usize);
+implement_diceext!(for
+    (i8, 64 bits),
+    (i16, 64 bits),
+    (i32, 64 bits),
+    (i64, 64 bits),
+    (i128, 128 bits),
+    (isize, 64 bits),
+    (u8, 64 bits),
+    (u16, 64 bits),
+    (u32, 64 bits),
+    (u64, 64 bits),
+    (u128, 128 bits),
+    (usize, 64 bits),
+);
 implement_float_diceext!(for f32, f64);//f128 unstable at time of writing... July 6, 2025.
 
 #[cfg(test)]
@@ -642,4 +784,17 @@ mod tests {
             handle.join().unwrap();
         }
     }
+
+    // #[test]
+    // fn mid_range_u8() {
+    //     for round in 1..=10 {
+    //     let mut ones = 0;
+    //     for _ in 0..100_000 {
+    //         let r = engine::GLOBAL_REACTOR_U8.roll(100) - 1;
+    //         ones += if r < 50 { 1 } else { 0 };
+    //     }
+    //     _ = env_logger::try_init();
+    //     log::debug!("round#{round} .. ones = {ones}; of 100,000");
+    //     }
+    // }
 }
