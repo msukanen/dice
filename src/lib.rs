@@ -132,11 +132,11 @@ impl DiceRollMatrixModifier for i32 {
 /// Dice roll matrix for e.g. serde parsing, etc.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DiceRollMatrix {
-    Exact { value: u8 },
+    Exact { value: i32 },
     Percentage(u8), // de: "123%" -> 123_u8, ser: 123u8 -> "123%"
     Chance(u8, Box<DiceRollMatrix>),
     Multi(u8, u8),
-    MultiWithMod(u8, u8, DiceRollMatrixMod)
+    MultiWithMod(u8, u8, DiceRollMatrixMod),
 }
 
 impl DiceRollMatrix {
@@ -156,13 +156,13 @@ impl DiceRollMatrix {
 
 impl From<i32> for DiceRollMatrix {
     fn from(value: i32) -> Self {
-        Self::from(value.max(0).min(u8::MAX as i32) as u8)
+        Self::Exact { value }
     }
 }
 
 impl From<u8> for DiceRollMatrix {
     fn from(value: u8) -> Self {
-        Self::Exact { value }
+        Self::Exact { value: value as i32 }
     }
 }
 
@@ -193,7 +193,7 @@ impl <'de> Deserialize<'de> for DiceRollMatrix {
             where E: Error,
             {
                 if v <= u8::MAX as u64 {
-                    Ok(DiceRollMatrix::Exact { value: v as u8 })
+                    Ok(DiceRollMatrix::Exact { value: v as i32 })
                 } else {
                     Err(E::custom(format!("'{v}' is too large for u8")))
                 }
@@ -208,7 +208,7 @@ impl <'de> Deserialize<'de> for DiceRollMatrix {
                 match key.as_str() {
                     "value" => {
                         let v: u8 = serde_json::from_value(raw).map_err(A::Error::custom)?;
-                        Ok(DiceRollMatrix::Exact { value: v })
+                        Ok(DiceRollMatrix::Exact { value: v as i32 })
                     }
 
                     "chance" => {
@@ -221,6 +221,32 @@ impl <'de> Deserialize<'de> for DiceRollMatrix {
                         let pct: u8 = serde_json::from_value(arr[0].clone()).map_err(A::Error::custom)?;
                         let inner: DiceRollMatrix = serde_json::from_value(arr[1].clone()).map_err(A::Error::custom)?;
                         Ok(DiceRollMatrix::Chance(pct, Box::new(inner)))
+                    }
+
+                    "range" => {
+                        let arr: Vec<serde_json::Value> = serde_json::from_value(raw).map_err(A::Error::custom)?;
+                        if arr.len() != 2 {
+                            return Err(A::Error::custom("range must be [a, b]"));
+                        }
+                        let a: i32 = serde_json::from_value(arr[0].clone()).map_err(A::Error::custom)?;
+                        let b: i32 = serde_json::from_value(arr[1].clone()).map_err(A::Error::custom)?;
+                        let (modf, delta) = if a > b {
+                            log::warn!("Range values require an U-turn from [{a},{b}] to [{b},{a}]. \
+                            See to changing that although we'll let that pass… for now.");
+                            let delta = a - b;
+                            (a - 1 - delta, delta as u8)
+                        } else {
+                            let delta = b - a;
+                            (b - 1 - delta, delta as u8)
+                        };
+                        if modf.abs() > u8::MAX as i32 {
+                            return Err(A::Error::custom(format!("Modifier {modf} doesn't fit into u8…")));
+                        }
+                        Ok(if delta == 0 {
+                            DiceRollMatrix::Exact { value: 0 }
+                        } else {
+                            DiceRollMatrix::MultiWithMod(1, delta, if modf < 0 { DiceRollMatrixMod::Sub(modf as u8)} else { DiceRollMatrixMod::Add(modf as u8) })
+                        })
                     }
 
                     _ => Err(A::Error::custom(format!("unknown offender '{key}' in DiceRollMatrix")))
