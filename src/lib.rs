@@ -468,6 +468,11 @@ pub trait RandomOf<T> : Clone {
     fn random_of(&self) -> Self::Output;
 }
 
+pub trait PlainRandomOf : Clone {
+    type Output;
+    fn random_of() -> Self::Output;
+}
+
 impl<T> RandomOf<T> for Vec<T>
 where T: Clone
 {
