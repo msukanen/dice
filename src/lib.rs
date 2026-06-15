@@ -379,10 +379,10 @@ pub trait IsOne {
 
 macro_rules! implement_isone_prim {
     ($prim:expr) => {paste!{
-        impl IsOne for [<i $prim>] { fn is_one(&self) -> bool {*self == 1 }}
-        impl IsOne for &[<i $prim>] { fn is_one(&self) -> bool {**self == 1 }}
-        impl IsOne for [<u $prim>] { fn is_one(&self) -> bool {*self == 1 }}
-        impl IsOne for &[<u $prim>] { fn is_one(&self) -> bool {**self == 1 }}
+        impl IsOne for [<i $prim>] { #[inline(always)] fn is_one(&self) -> bool {*self == 1 }}
+        impl IsOne for &[<i $prim>] { #[inline(always)] fn is_one(&self) -> bool {**self == 1 }}
+        impl IsOne for [<u $prim>] { #[inline(always)] fn is_one(&self) -> bool {*self == 1 }}
+        impl IsOne for &[<u $prim>] { #[inline(always)] fn is_one(&self) -> bool {**self == 1 }}
     }};
 }
 // Implement `IsOne` for all primitive integer types.
@@ -542,14 +542,14 @@ macro_rules! percentage_chance_of {
 
 macro_rules! implement_sign_dependant_diceext {
     ($t:ty, signed) => {paste! {
-        fn [<diceabs _ $t>](num: $t) -> $t {num.abs()}
-        fn [<dicerev _ $t>](num: $t) -> $t {-num}
-        fn [<dicelt0 _ $t>](num: $t) -> bool { num < 0 }
+        #[inline(always)] fn [<diceabs _ $t>](num: $t) -> $t {num.abs()}
+        #[inline(always)] fn [<dicerev _ $t>](num: $t) -> $t {-num}
+        #[inline(always)] fn [<dicelt0 _ $t>](num: $t) -> bool { num < 0 }
     }};
     ($t:ty, unsigned) => {paste! {
-        fn [<diceabs _ $t>](num: $t) -> $t {num}
-        fn [<dicerev _ $t>](num: $t) -> $t {num}
-        fn [<dicelt0 _ $t>](_: $t) -> bool { false }
+        #[inline(always)] fn [<diceabs _ $t>](num: $t) -> $t {num}
+        #[inline(always)] fn [<dicerev _ $t>](num: $t) -> $t {num}
+        #[inline(always)] fn [<dicelt0 _ $t>](_: $t) -> bool { false }
     }};
 }
 
@@ -667,17 +667,17 @@ mod engine {
 macro_rules! implement_diceext {
     ( for $(($t:ty, $bits:literal bits)),+ $(,)?) => {$(paste! {
         impl DiceExt for $t {
-            fn d(&self, sides: usize) -> Self { [<any _ $t>](*self, sides) }
-            fn d2(&self) -> Self { [<any _ $t>](*self, 2)}
-            fn d3(&self) -> Self { [<any _ $t>](*self, 3)}
-            fn d4(&self) -> Self { [<any _ $t>](*self, 4)}
-            fn d5(&self) -> Self { [<any _ $t>](*self, 5)}
-            fn d6(&self) -> Self { [<any _ $t>](*self, 6)}
-            fn d8(&self) -> Self { [<any _ $t>](*self, 8)}
-            fn d10(&self) -> Self { [<any _ $t>](*self, 10)}
-            fn d12(&self) -> Self { [<any _ $t>](*self, 12)}
-            fn d20(&self) -> Self { [<any _ $t>](*self, 20)}
-            fn d100(&self) -> Self { [<any _ $t>](*self, 100)}
+            #[inline(always)] fn d(&self, sides: usize) -> Self { [<any _ $t>](*self, sides) }
+            #[inline(always)] fn d2(&self) -> Self { [<any _ $t>](*self, 2)}
+            #[inline(always)] fn d3(&self) -> Self { [<any _ $t>](*self, 3)}
+            #[inline(always)] fn d4(&self) -> Self { [<any _ $t>](*self, 4)}
+            #[inline(always)] fn d5(&self) -> Self { [<any _ $t>](*self, 5)}
+            #[inline(always)] fn d6(&self) -> Self { [<any _ $t>](*self, 6)}
+            #[inline(always)] fn d8(&self) -> Self { [<any _ $t>](*self, 8)}
+            #[inline(always)] fn d10(&self) -> Self { [<any _ $t>](*self, 10)}
+            #[inline(always)] fn d12(&self) -> Self { [<any _ $t>](*self, 12)}
+            #[inline(always)] fn d20(&self) -> Self { [<any _ $t>](*self, 20)}
+            #[inline(always)] fn d100(&self) -> Self { [<any _ $t>](*self, 100)}
         }
 
         /// Throw given `num` of dice, each with x `sides`.
@@ -709,13 +709,8 @@ macro_rules! implement_diceext {
     }
 
     impl HiLo for $t {
-        fn hi(&self) -> bool {
-            self.is_even()
-        }
-
-        fn lo(&self) -> bool {
-            self.is_odd()
-        }
+        #[inline(always)] fn hi(&self) -> bool { self.is_even() }
+        #[inline(always)] fn lo(&self) -> bool { self.is_odd() }
     }
     )+};
 }
