@@ -504,15 +504,9 @@ where T: Clone
     }
 }
 
-/// Take a number and alter it by up to (or less, of course) ±X%.
-// fn jitter_perc<T: Float + ToPrimitive>(original: &T, percentage: f64) -> T {
-//     let p = 0.01 * percentage;
-//     *original * NumCast::from(1.0 + rand::rng().random_range(-p..=p)).unwrap()
-// }
-
 #[macro_export]
 /// Roll some arbitrary dice and see if their result is "low".
-macro_rules! lo {() => {{ use dicebag::HiLo; 1_i32.d2().lo() }}}
+macro_rules! lo {() => {{ use dicebag::{DiceExt, HiLo}; 1_i32.d2().lo() }}}
 
 #[macro_export]
 /// Roll some arbitrary dice and see if their result is "high".
@@ -700,11 +694,10 @@ macro_rules! implement_diceext {
                 });
             }
             let mut result: $t = 0;
-            let reverse = [<dicelt0 _ $t>](num);
             for _ in 0..[<diceabs _ $t>](num) {
                 result += std::hint::black_box(engine::[<GLOBAL_REACTOR_U $bits>].roll(sides as [<u $bits>]) as $t);
             }
-            if reverse {[<dicerev _ $t>](result)} else {result}
+            if [<dicelt0 _ $t>](num) {[<dicerev _ $t>](result)} else {result}
         }
     }
 
@@ -765,8 +758,9 @@ mod tests {
 
     #[test]
     fn test_dicebag_is_completely_non_deterministic() {
-        // seq of 100 dice rolls (with d10000 for high variancy)
-        let sample_size = 100;
+        _ = env_logger::try_init();
+        // seq of 10,000 dice rolls (with d10000 for high variancy)
+        let sample_size = 10_000;
         let sides = 10_000;
         
         // 1st seq
@@ -784,8 +778,6 @@ mod tests {
             thread::sleep(Duration::from_micros(10));
         }
 
-        // assert_eq!(seq_a.len(), seq_b.len());
-
         // how many elements match at the same index?
         let mut matches = 0;
         for i in 0..sample_size {
@@ -796,7 +788,7 @@ mod tests {
 
         // with 10k sides, back-to-back mirrors are statistically a farce.
         // Matches should be near zero. If they aren't, the machine lied to us!
-        println!("Identical rolls at matching positions: {}/{}", matches, sample_size);
+        log::debug!("Identical rolls at matching positions: {}/{}", matches, sample_size);
         assert!(
             matches < (sample_size / 10), 
             "Sequences are too similar! We have a determinist amongst us!"
