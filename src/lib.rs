@@ -56,7 +56,7 @@
 //! assert!(x.tag == "a" || x.tag == "b" || x.tag == "c");
 //! ```
 //! 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use num::{ Float, Integer };
 use paste::paste;
@@ -498,6 +498,19 @@ where T: Clone
     fn random_of(&self) -> Self::Output {
         if self.is_empty() { panic!("Empty HashSet - can't pick a random from that. Anyway… Ta-ta 'til that's fixed.")}
         let Some(ent) = self.iter().nth((1_usize.d(self.len()) - 1) as usize) else {
+            panic!("For some reason the HashSet has less entries in it than .len() suggests?!");
+        };
+        T::clone(ent)
+    }
+}
+
+impl <T> RandomOf<T> for HashMap<String, T>
+where T: Clone
+{
+    type Output = T;
+    fn random_of(&self) -> Self::Output {
+        if self.is_empty() { panic!("Empty HashMap - can't pick a random from that. Anyway… Ta-ta 'til that's fixed.")}
+        let Some((_,ent)) = self.iter().nth((1_usize.d(self.len()) - 1) as usize) else {
             panic!("For some reason the HashSet has less entries in it than .len() suggests?!");
         };
         T::clone(ent)
