@@ -56,7 +56,7 @@
 //! assert!(x.tag == "a" || x.tag == "b" || x.tag == "c");
 //! ```
 //! 
-use std::collections::{HashMap, HashSet};
+use std::{collections::{HashMap, HashSet}, hash::Hash};
 
 use num::{ Float, Integer };
 use paste::paste;
@@ -473,6 +473,11 @@ pub trait PlainRandomOf : Clone {
     fn random_of() -> Self::Output;
 }
 
+pub trait KeyedRandomOf<K,T> : Clone {
+    type Output;
+    fn random_of(&self) -> Self::Output;
+}
+
 impl<T> RandomOf<T> for Vec<T>
 where T: Clone
 {
@@ -511,7 +516,20 @@ where T: Clone
     fn random_of(&self) -> Self::Output {
         if self.is_empty() { panic!("Empty HashMap - can't pick a random from that. Anyway… Ta-ta 'til that's fixed.")}
         let Some((_,ent)) = self.iter().nth((1_usize.d(self.len()) - 1) as usize) else {
-            panic!("For some reason the HashSet has less entries in it than .len() suggests?!");
+            panic!("For some reason the HashMap has less entries in it than .len() suggests?!");
+        };
+        T::clone(ent)
+    }
+}
+
+impl <K,T> KeyedRandomOf<K,T> for HashMap<K,T>
+where T: Clone, K: Hash + Clone
+{
+    type Output = T;
+    fn random_of(&self) -> Self::Output {
+        if self.is_empty() { panic!("Empty HashMap - can't pick a random from that. Anyway… Ta-ta 'til that's fixed.")}
+        let Some((_,ent)) = self.iter().nth((1_usize.d(self.len()) - 1) as usize) else {
+            panic!("For some reason the HashMap has less entries in it than .len() suggests?!");
         };
         T::clone(ent)
     }
