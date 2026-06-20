@@ -49,6 +49,11 @@ Just make sure your container has at least one entry in it as otherwise
 things will catch fire (panic). `.random_of()` really can't choose
 a random element out of nothing given…
 
+## dicebag::KeyedRandomOf\<K, T\>
+
+A trait for randomizing against e.g. `HashMap` entries.
+Just like with `dicebag::RandomOf`, panic ensues if the map is empty.
+
 ```rust
 use dicebag::RandomOf;
 let v = vec![2,4,6,8,10];
