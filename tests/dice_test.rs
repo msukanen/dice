@@ -1,4 +1,4 @@
-use std::{clone, collections::HashSet};
+use std::{collections::HashSet, thread};
 
 use dicebag::*;
 use serde::Deserialize;
@@ -44,8 +44,10 @@ fn chance_macro_works() {
 #[test]
 fn random_of_vec() {
     let vs = vec![&1,&2,&3,&4,&5];
-    let v = vs.random_of();
-    assert_ne!(0, *v);
+    for _ in 0..10_000 {
+        let v = vs.random_of();
+        assert!(*v >= 1 && *v <= 5, "Hol' a moment! We got an out of bounds, wild {v} amongst us!");
+    }
 }
 
 #[test]
@@ -99,6 +101,8 @@ fn chance_50perc() {
         }
     }
     assert!(ones >= 45000 && ones <= 55000, "Strange number of ones: {ones}; expected 4.5–5.5 mid range");
+    _ = env_logger::try_init();
+    log::debug!("Exactly {ones} '1's out of 100,000 pool of 50% chances.")
 }
 
 #[test]
@@ -178,4 +182,68 @@ fn drm_roundtrip_nested_chance() {
     let ser = serde_json::to_string(&drm).unwrap();
     let drm2: DiceRollMatrix = serde_json::from_str(&ser).unwrap();
     assert_eq!(drm2, drm);
+}
+
+/// Pester the engine from all directions to make sure it mangles
+/// output without screaming in panic, deadlocking, or having any
+/// other dreadful issues …
+#[test]
+fn test_concurrent_clobbering() {
+    let mut handles = vec![];
+    
+    for _ in 0..100 {
+        handles.push(thread::spawn(|| {
+            for _ in 0..10_000 {
+                let roll = 1_i64.d(100);
+                assert!(roll >= 1 && roll <= 100);
+            }
+        }));
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+}
+
+#[test]
+fn test_dicebag_is_completely_non_deterministic() {
+    use std::{time::Duration, thread};
+    
+    _ = env_logger::try_init();
+    // seq of 10,000 dice rolls (with d10000 for high variancy)
+    let sample_size = 10_000;
+    let sides = 100;
+    
+    // 1st seq
+    let mut seq_a = Vec::with_capacity(sample_size);
+    for _ in 0..sample_size {
+        seq_a.push(1_i32.d(sides));
+        // snooze a moment
+        thread::sleep(Duration::from_micros(10));
+    }
+
+    // 2nd seq
+    let mut seq_b = Vec::with_capacity(sample_size);
+    for _ in 0..sample_size {
+        seq_b.push(1_i32.d(sides));
+        thread::sleep(Duration::from_micros(10));
+    }
+
+    // how many elements match at the same index?
+    let mut matches = 0;
+    for i in 0..sample_size {
+        if seq_a[i] == seq_b[i] {
+            matches += 1;
+        }
+    }
+
+    // ... back-to-back mirrors are statistically a farce.
+    // Matches should be near zero. If they aren't, the machine lied to us!
+    log::debug!("Identical rolls at matching positions: {}/{}", matches, sample_size);
+    assert!(
+        matches < (sample_size / 10), 
+        "Sequences are too similar! We have a determinist amongst us!"
+    );
+    
+    assert_ne!(seq_a, seq_b, "Something gone really, really wrong - seq B perfectly mirrored A!");
 }

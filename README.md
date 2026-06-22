@@ -66,7 +66,7 @@ let x = abc.random_of();
 assert!(x.tag == "a" || x.tag == "b" || x.tag == "c");
 ```
 
-## Technobabble
+## Technobabble and Chaos Theory
 
 ***dicebag*** isn't a PRNG, and it's not CRNG either. It's **Chaos-RNG**,
 a one-way entropy shredder.
