@@ -20,12 +20,17 @@
 //! ## `HiLo`
 //! 
 //! Coin flipping, using whatever datatype you implement it for…
-//! Comes with two convenience macros so that you don't need to
-//! write those yourself:
+//! Comes with two convenience macros that dynamically infer their return 
+//! type based on your assignment context:
+//!
 //! ```
 //! use dicebag::{DiceExt, HiLo, lo, hi};
-//! if lo!() {/* do something if result was "low" */}
-//! if hi!() {/* do something if result was "high" */}
+//! 
+//! // The macros adapt seamlessly to left-side type.
+//! let is_high_u8: u8 = hi!(); 
+//! let is_low_i64: i64 = lo!();
+//! 
+//! if lo!() { /* do something if result was "low" */ }
 //! ```
 //! 
 //! ## `InclusiveRandomRange`
@@ -39,7 +44,9 @@
 //! 
 //! ## `RandomOf<T>`
 //! 
-//! A trait to get some random entry of e.g. [Vec].
+//! A trait to get some random entry from e.g. [Vec] or [HashSet]
+//! (or some other sequential whatsoever,
+//!  if you decide to explicit impl the `RandomOf<T>` for it).
 //! 
 //! Just make sure your container has at least one entry in it as otherwise
 //! things will catch fire (panic). `.random_of()` really can't choose
@@ -55,8 +62,16 @@
 //! let x = abc.random_of();
 //! assert!(x.tag == "a" || x.tag == "b" || x.tag == "c");
 //! ```
+//!
+//! ## `KeyedRandomOf<K,T>`
 //! 
-use std::{collections::{HashMap, HashSet}, hash::Hash};
+//! As per `RandomOf<T>`, but for e.g. [HashMap]s.
+//! 
+//! Just make sure your container has at least one entry in it as otherwise
+//! things will catch fire (panic). `.random_of()` really can't choose
+//! a random element out of nothing given…
+//! 
+use std::{alloc::GlobalAlloc, collections::{HashMap, HashSet}, hash::Hash};
 
 use num::{ Float, Integer };
 use paste::paste;
@@ -478,6 +493,11 @@ pub trait KeyedRandomOf<K,T> : Clone {
     fn random_of(&self) -> Self::Output;
 }
 
+pub trait KeyedAllocatorRandomOf<K,T,A> : Clone {
+    type Output;
+    fn random_of(&self) -> Self::Output;
+}
+
 impl<T> RandomOf<T> for Vec<T>
 where T: Clone
 {
@@ -524,6 +544,22 @@ where T: Clone
 
 impl <K,T> KeyedRandomOf<K,T> for HashMap<K,T>
 where T: Clone, K: Hash + Clone
+{
+    type Output = T;
+    fn random_of(&self) -> Self::Output {
+        if self.is_empty() { panic!("Empty HashMap - can't pick a random from that. Anyway… Ta-ta 'til that's fixed.")}
+        let Some((_,ent)) = self.iter().nth((1_usize.d(self.len()) - 1) as usize) else {
+            panic!("For some reason the HashMap has less entries in it than .len() suggests?!");
+        };
+        T::clone(ent)
+    }
+}
+
+impl <K,T,A> KeyedAllocatorRandomOf<K,T,A> for HashMap<K,T,A>
+where
+    T: Clone,
+    K: Hash + Clone,
+    A: Clone,
 {
     type Output = T;
     fn random_of(&self) -> Self::Output {
@@ -740,28 +776,29 @@ macro_rules! implement_diceext {
 }
 
 macro_rules! implement_float_diceext {
-    ( for $($t:ty),+) => {paste!{
-        $(
-            impl FixedNumberVariance<$t> for $t {
-                fn upto_delta(&self, upto: Self) -> Self {self.jitter_within(upto)}
-                fn jitter_within(&self, upto: Self) -> Self {
-                    if upto <= 0.0 { return *self; }
-                    let raw_bits = engine::GLOBAL_REACTOR_U64.roll(u64::MAX);
-                    let scale = (raw_bits & (([<$t>]::MANTISSA_DIGITS as u64) -1)) as $t
-                                / (([<$t>]::MANTISSA_DIGITS as u64) - 1) as $t;
-                    self + ((scale * 2.0 * upto ) - upto)
-                }
+    ( for $($t:ty),+ ) => { $( implement_float_diceext!($t); )+ };
+    (f128) => { implement_float_diceext!(reactor U128, u128, 113, $t); };
+    ($t:ty) => { implement_float_diceext!(reactor U64, u64, 63, $t); };
+    (reactor $r:ident, $type:ty, $mantissa_bits:literal, $t:ty) => {paste!{
+        impl FixedNumberVariance<$t> for $t {
+            fn upto_delta(&self, upto: Self) -> Self {self.jitter_within(upto)}
+            fn jitter_within(&self, upto: Self) -> Self {
+                if upto <= 0.0 { return *self; }
+                let raw_bits = engine::[<GLOBAL_REACTOR_ $r>].roll($type::MAX);
+                let mantissa_bits = ([<$t>]::MANTISSA_DIGITS as u32).min($mantissa_bits);
+                let max_mask = ((1 as $type) << mantissa_bits) - 1;
+                let scale = (raw_bits & max_mask) as $t / max_mask as $t;
+                self + ((scale * 2.0 * upto ) - upto)
             }
+        }
 
-            impl PercentageVariance for $t {
-                fn delta(&self, percentage: i32) -> Self { self.jitter_percentage(percentage as f64) }
-                fn jitter_percentage(&self, percentage: f64) -> Self {
-                    let p = 0.01 * percentage;
-                    let upto = self.abs() * p as $t;
-                    self.jitter_within(upto)
-                }
+        impl PercentageVariance for $t {
+            fn delta(&self, percentage: i32) -> Self { self.jitter_percentage(percentage as f64) }
+            fn jitter_percentage(&self, percentage: f64) -> Self {
+                let p = 0.01 * percentage as $t;
+                self.jitter_within( self.abs() * p )
             }
-        )+
+        }
     }};
 }
 
@@ -779,4 +816,7 @@ implement_diceext!(for
     (u128, 128 bits),
     (usize, 64 bits),
 );
+#[cfg(not(feature = "f128-stable"))]
 implement_float_diceext!(for f32, f64);//f128 unstable at time of writing... July 6, 2025.
+#[cfg(feature = "f128-stable")]
+implement_float_diceext!(for f32, f64, f128);
