@@ -71,7 +71,7 @@
 //! things will catch fire (panic). `.random_of()` really can't choose
 //! a random element out of nothing given…
 //! 
-use std::{alloc::GlobalAlloc, collections::{HashMap, HashSet}, hash::Hash};
+use std::{collections::{HashMap, HashSet}, hash::Hash};
 
 use num::{ Float, Integer };
 use paste::paste;
@@ -178,6 +178,12 @@ impl From<i32> for DiceRollMatrix {
 impl From<u8> for DiceRollMatrix {
     fn from(value: u8) -> Self {
         Self::Exact { value: value as i32 }
+    }
+}
+
+impl From<&DiceRollMatrix> for bool {
+    fn from(value: &DiceRollMatrix) -> Self {
+        value.roll() > 0
     }
 }
 
