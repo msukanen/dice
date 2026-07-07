@@ -602,9 +602,10 @@ macro_rules! percentage_chance_of {
         if 1_i32.d100() <= $chance { $v } else { 0.0 }
     }};
 
-    ($chance:expr, $v:expr) => {
+    ($chance:expr, $v:expr) => {{
+        use dicebag::DiceExt;
         if 1_i32.d100() <= $chance { $v } else { 0 }
-    };
+    }};
 }
 
 macro_rules! implement_sign_dependant_diceext {
@@ -690,42 +691,16 @@ mod engine {
         }};
     }
     macro_rules! implement_chaos_engine_struct {
-        // (for $($t:ty => $u:ty),+ $(,)?) => {$(paste! {
-        //     core_chaos_engine_struct!($t, $u);
-        // })+};
-
         (for $(($t:ty, $bits:literal bits)),+ $(,)?) => {$(paste! {
             core_chaos_engine_struct!($t, $t, $bits);
         })+};
     }
 
     const_chaos_engine_crng_vals!(for
-        // [i8, 9, 85, 33],
-        // [i16, 17, 25173, 13849],
-        // [i32, 33, 1664525, 1013904223],
-        // [i64, 65, 6364136223846793005, 1442695040888963407],
-        // [i128, 129, 22695477 as i128, 1],
-        // [isize, 321, 6364136223846793005, 1442695040888963407],
-        // [u8, 11, 85, 33],
-        // [u16, 19, 25173, 13849],
-        // [u32, 35, 1664525, 1013904223],
         [u64, 64 bits, 67, 6364136223846793005, 1442695040888963407],
         [u128, 128 bits, 131, 22695477 as u128, 1],
-        // [usize, 747, 6364136223846793005, 1442695040888963407],
     );
-    // implement_chaos_engine_struct!(for
-        // i8 => u8,
-        // i16 => u16,
-        // i32 => u32,
-        // i64 => u64,
-        // i128 => u128,
-        // isize => u64,
-        // usize => u64
-    // );
     implement_chaos_engine_struct!(for
-        // u8,
-        // u16,
-        // u32,
         (u64, 64 bits),
         (u128, 128 bits),
     );
@@ -783,7 +758,7 @@ macro_rules! implement_diceext {
 
 macro_rules! implement_float_diceext {
     ( for $($t:ty),+ ) => { $( implement_float_diceext!($t); )+ };
-    (f128) => { implement_float_diceext!(reactor U128, u128, 113, $t); };
+    (f128) => { implement_float_diceext!(reactor U128, u128, 113, f128); };
     ($t:ty) => { implement_float_diceext!(reactor U64, u64, 63, $t); };
     (reactor $r:ident, $type:ty, $mantissa_bits:literal, $t:ty) => {paste!{
         impl FixedNumberVariance<$t> for $t {
