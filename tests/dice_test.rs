@@ -210,8 +210,8 @@ fn test_dicebag_is_completely_non_deterministic() {
     use std::{time::Duration, thread};
     
     _ = env_logger::try_init();
-    // seq of 10,000 dice rolls (with d10000 for high variancy)
-    let sample_size = 10_000;
+    // seq of 100,000 dice rolls
+    let sample_size = 100_000;
     let sides = 100;
     
     // 1st seq

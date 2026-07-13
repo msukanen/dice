@@ -24,11 +24,7 @@
 //! type based on your assignment context:
 //!
 //! ```
-//! use dicebag::{DiceExt, HiLo, lo, hi};
-//! 
-//! // The macros adapt seamlessly to left-side type.
-//! let is_high_u8: u8 = hi!(); 
-//! let is_low_i64: i64 = lo!();
+//! use dicebag::lo;
 //! 
 //! if lo!() { /* do something if result was "low" */ }
 //! ```
@@ -441,6 +437,18 @@ impl InclusiveRandomRange<i32> for std::ops::RangeInclusive<i32> {
     }
 }
 
+#[cfg(feature = "f128-stable")]
+impl InclusiveRandomRange<f128> for std::ops::RangeInclusive<f64> {
+    fn random_of(&self) -> f128 {
+        let (mut start, mut end) = (*self.start(), *self.end());
+        if start > end { std::mem::swap(&mut start, &mut end); }// swap endpoints if needed…
+
+        let raw_bits = engine::GLOBAL_REACTOR_U128.roll(u128::MAX);
+        let max_m = (1u128 << 113) - 1; // use 113 bits of mantissa of the f128
+        start + ((raw_bits & max_m) as f128 / max_m as f128) * (end - start)
+    }
+}
+
 impl InclusiveRandomRange<f64> for std::ops::RangeInclusive<f64> {
     fn random_of(&self) -> f64 {
         let (mut start, mut end) = (*self.start(), *self.end());
@@ -449,7 +457,6 @@ impl InclusiveRandomRange<f64> for std::ops::RangeInclusive<f64> {
         let raw_bits = engine::GLOBAL_REACTOR_U64.roll(u64::MAX);
         let max_m = (1u64 << 53) - 1; // use 53 bits of mantissa of the f64
         start + ((raw_bits & max_m) as f64 / max_m as f64) * (end - start)
-        // rand::rng().random_range(start..=end)
     }
 }
 
@@ -461,7 +468,6 @@ impl InclusiveRandomRange<f32> for std::ops::RangeInclusive<f32> {
         let raw_bits = engine::GLOBAL_REACTOR_U64.roll(u64::MAX);
         let max_m = (1u32 << 24) - 1; // use 24 bits of mantissa of the f32
         start + ((raw_bits as u32 & max_m) as f32 / max_m as f32) * (end - start)
-        // rand::rng().random_range(start..=end)
     }
 }
 
