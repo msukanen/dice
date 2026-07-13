@@ -804,6 +804,6 @@ implement_diceext!(for
     (usize, 64 bits),
 );
 #[cfg(not(feature = "f128-stable"))]
-implement_float_diceext!(for f32, f64);//f128 unstable at time of writing... July 6, 2025.
+implement_float_diceext!(for f32, f64);//f128 still unstable: 13th Jul 2026
 #[cfg(feature = "f128-stable")]
 implement_float_diceext!(for f32, f64, f128);
