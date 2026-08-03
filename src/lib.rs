@@ -583,6 +583,19 @@ where
     }
 }
 
+impl <T, const N: usize> RandomOf<T> for [T;N]
+where
+    T: Clone,
+{
+    type Output = T;
+    fn random_of(&self) -> Self::Output {
+        if N == 0 { panic!("Empty array - can't pick a random from that!")}
+
+        let idx = 1.d(N) - 1;
+        self[idx].clone()
+    }
+}
+
 #[macro_export]
 /// Roll some arbitrary dice and see if their result is "low".
 macro_rules! lo {() => {{ use dicebag::{DiceExt, HiLo}; 1_i32.d2().lo() }}}

@@ -95,14 +95,14 @@ fn dice_roll_modifiers() {
 fn chance_50perc() {
     let c = DiceRollMatrix::Chance(50, Box::new(DiceRollMatrix::Exact { value: 1 }));
     let mut ones = 0;
-    for _ in 0..100_000 {
+    for _ in 0..10_000_000 {
         if c.roll() == 1 {
             ones += 1;
         }
     }
-    assert!(ones >= 45000 && ones <= 55000, "Strange number of ones: {ones}; expected 4.5–5.5 mid range");
+    assert!(ones >= 4500000 && ones <= 5500000, "Strange number of ones: {ones}; expected 4.5–5.5 mid range");
     _ = env_logger::try_init();
-    log::debug!("Exactly {ones} '1's out of 100,000 pool of 50% chances.")
+    log::debug!("Exactly {ones} '1's out of 10,000,000 pool of 50% chances.")
 }
 
 #[test]
@@ -246,4 +246,24 @@ fn test_dicebag_is_completely_non_deterministic() {
     );
     
     assert_ne!(seq_a, seq_b, "Something gone really, really wrong - seq B perfectly mirrored A!");
+}
+
+#[test]
+fn longest_streak_above_50() {
+    let mut longest = 0;
+    let mut curr = 0;
+    for _ in 0..1_000_000 {
+        let x = 1.d100();
+        if x > 50 {
+            curr += 1;
+            if curr > longest {
+                longest = curr;
+            }
+        } else {
+            curr = 0;
+        }
+    }
+    _ = env_logger::try_init();
+    assert!(longest < 24, "Expected 19-20 at most, got {}", longest);
+    log::debug!("Longest streak above 50: {longest}");
 }
