@@ -816,10 +816,22 @@ macro_rules! implement_float_diceext {
             }
         }
 
+        // TODO: adjust this to simulate "chipped" dice properly.
         fn [<dext_chop_suey_ $t>](what: $t, sides: usize) -> $t {
+            if what == 0.0 { return 0.0 }
+
             let wr = |w| w * 1_usize.d(sides) as $t;
             match what as usize {
-                0 => wr(what),
+                0 => {
+                    let primary = 1_usize.d(sides);
+                    let antipode = (sides + 1) - primary;
+                    let frac_p = what * 100.0;
+                    if 1.d100() as $t <= frac_p {
+                        (primary as $t + antipode as $t) / 2.0
+                    } else {
+                        primary as $t
+                    }
+                },
                 x => x.d(sides) as $t + wr(what - x as $t)
             }
         }

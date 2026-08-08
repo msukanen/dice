@@ -10,12 +10,16 @@ and `usize` is supported alongside `f32`/`f64` (and future `f128`).
 ## dicebag::DiceExt
 
 Covers the core intent dice rollings, e.g. `3.d6()`, `2.d10()`.
+For fun and other reasons, floats can do dice rolling too…
 
 ```rust
 use dicebag::DiceExt;
 let a = 3.d6();
 let b = 2_u8.d4();
 let c = 5.d(a-3); // FYI: zero as dice size results in 0...
+let d = 0.999.d6(); // old, chipped plastic D6 ;)
+let f = 123.456.d(7); // roll 123.456 d7's...
+let r = [123.456..=456.789].random_of(91); // ...you get the gist, I hope.
 ```
 
 ## dicebag::HiLo
