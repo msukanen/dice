@@ -1,6 +1,7 @@
-use std::{collections::HashSet, thread};
+use std::{collections::{HashMap, HashSet}, thread};
 
 use dicebag::*;
+use nohash::BuildNoHashHasher;
 use serde::Deserialize;
 
 /// See that D6 rolls stay within range.
@@ -266,4 +267,17 @@ fn longest_streak_above_50() {
     _ = env_logger::try_init();
     assert!(longest < 24, "Expected 19-20 at most, got {}", longest);
     log::debug!("Longest streak above 50: {longest}");
+}
+
+#[test]
+fn appearance_of_1_to_100() {
+    let mut app: HashMap<usize, usize, BuildNoHashHasher<usize>> = HashMap::default();
+    for _ in 0..1_000_000 {
+        let x = 1.d100();
+        *app.entry(x).or_default() += 1;
+    }
+    _ = env_logger::try_init();
+    for (k,c) in app {
+        log::debug!("{k} → {c} times out of 1,000,000");
+    }
 }
