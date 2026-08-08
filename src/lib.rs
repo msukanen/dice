@@ -628,6 +628,11 @@ macro_rules! percentage_chance_of {
 }
 
 macro_rules! implement_sign_dependant_diceext {
+    ([$($t:tt),*]) => {paste!{
+        $(  implement_sign_dependant_diceext!([<u $t>], unsigned);
+            implement_sign_dependant_diceext!([<i $t>], signed);
+        )+
+    }};
     ($t:ty, signed) => {paste! {
         #[inline(always)] fn [<diceabs _ $t>](num: $t) -> $t {num.abs()}
         #[inline(always)] fn [<dicerev _ $t>](num: $t) -> $t {-num}
@@ -639,19 +644,7 @@ macro_rules! implement_sign_dependant_diceext {
         #[inline(always)] fn [<dicelt0 _ $t>](_: $t) -> bool { false }
     }};
 }
-
-implement_sign_dependant_diceext!(i8, signed);
-implement_sign_dependant_diceext!(i16, signed);
-implement_sign_dependant_diceext!(i32, signed);
-implement_sign_dependant_diceext!(i64, signed);
-implement_sign_dependant_diceext!(i128, signed);
-implement_sign_dependant_diceext!(isize, signed);
-implement_sign_dependant_diceext!(u8, unsigned);
-implement_sign_dependant_diceext!(u16, unsigned);
-implement_sign_dependant_diceext!(u32, unsigned);
-implement_sign_dependant_diceext!(u64, unsigned);
-implement_sign_dependant_diceext!(u128, unsigned);
-implement_sign_dependant_diceext!(usize, unsigned);
+implement_sign_dependant_diceext!([8,16,32,64,128,size]);
 
 mod engine {
     use std::{cell::UnsafeCell, sync::atomic::AtomicBool};
@@ -725,33 +718,54 @@ mod engine {
     );
 }
 
+/// Implement [DiceExt] and associated `any_..()` fns
+/// for a variety of integer-ish types.
+/// 
 macro_rules! implement_diceext {
-    ( for $(($t:ty, $bits:literal bits)),+ $(,)?) => {$(paste! {
+    // The main entrance.
+    ([$($t:tt),*]) => {$(paste! {
+        implement_diceext!($t, bits $t);
+    })+};
+    // 128-bit sieve…
+    ($t:tt, bits 128) => {paste!{
+        implement_diceext!(actual [<u $t>], reactor 128);
+        implement_diceext!(actual [<i $t>], reactor 128);
+    }};
+    // other-than 128-bit sieve…
+    ($t:tt, bits $_:tt) => {paste!{
+        implement_diceext!(actual [<u $t>], reactor 64);
+        implement_diceext!(actual [<i $t>], reactor 64);
+    }};
+    // Impl site for *actual* primitive type (along the reactor size for it).
+    (actual $t:ty, reactor $bits:literal) => {paste!{
         impl DiceExt for $t {
-            #[inline(always)] fn d(&self, sides: usize) -> Self { [<any _ $t>](*self, sides) }
-            #[inline(always)] fn d2(&self) -> Self { [<any _ $t>](*self, 2)}
-            #[inline(always)] fn d3(&self) -> Self { [<any _ $t>](*self, 3)}
-            #[inline(always)] fn d4(&self) -> Self { [<any _ $t>](*self, 4)}
-            #[inline(always)] fn d5(&self) -> Self { [<any _ $t>](*self, 5)}
-            #[inline(always)] fn d6(&self) -> Self { [<any _ $t>](*self, 6)}
-            #[inline(always)] fn d8(&self) -> Self { [<any _ $t>](*self, 8)}
-            #[inline(always)] fn d10(&self) -> Self { [<any _ $t>](*self, 10)}
-            #[inline(always)] fn d12(&self) -> Self { [<any _ $t>](*self, 12)}
-            #[inline(always)] fn d20(&self) -> Self { [<any _ $t>](*self, 20)}
-            #[inline(always)] fn d100(&self) -> Self { [<any _ $t>](*self, 100)}
+            #[inline(always)] fn d(&self, sides: usize) -> Self { [<any_ $t>](*self, sides) }
+            #[inline(always)] fn d2(&self) -> Self { [<any_ $t>](*self, 2)}
+            #[inline(always)] fn d3(&self) -> Self { [<any_ $t>](*self, 3)}
+            #[inline(always)] fn d4(&self) -> Self { [<any_ $t>](*self, 4)}
+            #[inline(always)] fn d5(&self) -> Self { [<any_ $t>](*self, 5)}
+            #[inline(always)] fn d6(&self) -> Self { [<any_ $t>](*self, 6)}
+            #[inline(always)] fn d8(&self) -> Self { [<any_ $t>](*self, 8)}
+            #[inline(always)] fn d10(&self) -> Self { [<any_ $t>](*self, 10)}
+            #[inline(always)] fn d12(&self) -> Self { [<any_ $t>](*self, 12)}
+            #[inline(always)] fn d20(&self) -> Self { [<any_ $t>](*self, 20)}
+            #[inline(always)] fn d100(&self) -> Self { [<any_ $t>](*self, 100)}
         }
 
         /// Throw given `num` of dice, each with x `sides`.
-        fn [<any _ $t>](num: $t, sides: usize) -> $t {
+        fn [<any_ $t>](num: $t, sides: usize) -> $t {
+            // Warm up the reactor if needed…
             if engine::[<REACTOR_U $bits _WARMED>].compare_exchange(false, true, std::sync::atomic::Ordering::Relaxed, std::sync::atomic::Ordering::Relaxed).is_ok() {
-                // chaos seed
+                // chaos time!
                 let x = std::time::Instant::now();
                 let ptr = &x as *const _ as u64;
                 let b = std::time::Instant::now().elapsed().as_nanos() as u64;
                 let z = ptr ^ b.rotate_left(7);
+                // spin the wheels briefly
                 for _ in 0..(z.rotate_left((ptr & 0xF) as u32)).wrapping_rem(512).max(128) {
                     engine::[<GLOBAL_REACTOR_U $bits>].roll(sides as [<u $bits>]);
                 }
+                // put the monkey into wrenches, or wrench tossing monkey into the gears… or, depends™
                 std::thread::spawn(|| {
                     let sleep_dur = std::time::Duration::from_micros(25);
                     loop {
@@ -772,11 +786,13 @@ macro_rules! implement_diceext {
         #[inline(always)] fn hi(&self) -> bool { self.is_even() }
         #[inline(always)] fn lo(&self) -> bool { self.is_odd() }
     }
-    )+};
+    };
 }
+implement_diceext!([8,16,32,64,size,128]);
 
+/// Implement some dice extensions for float types.
 macro_rules! implement_float_diceext {
-    ( for $($t:ty),+ ) => { $( implement_float_diceext!($t); )+ };
+    ([$($t:ty),*]) => { $( implement_float_diceext!($t); )+ };
     (f128) => { implement_float_diceext!(reactor U128, u128, 113, f128); };
     ($t:ty) => { implement_float_diceext!(reactor U64, u64, 63, $t); };
     (reactor $r:ident, $type:ty, $mantissa_bits:literal, $t:ty) => {paste!{
@@ -799,24 +815,32 @@ macro_rules! implement_float_diceext {
                 self.jitter_within( self.abs() * p )
             }
         }
+
+        fn [<dext_chop_suey_ $t>](what: $t, sides: usize) -> $t {
+            let wr = |w| w * 1_usize.d(sides) as $t;
+            match what as usize {
+                0 => wr(what),
+                x => x.d(sides) as $t + wr(what - x as $t)
+            }
+        }
+
+        impl DiceExt for $t {
+            #[inline(always)] fn d(&self, sides: usize) -> Self { [<dext_chop_suey_ $t>](*self, sides) }
+            #[inline(always)] fn d2(&self) -> Self { [<dext_chop_suey_ $t>](*self, 2)}
+            #[inline(always)] fn d3(&self) -> Self { [<dext_chop_suey_ $t>](*self, 3)}
+            #[inline(always)] fn d4(&self) -> Self { [<dext_chop_suey_ $t>](*self, 4)}
+            #[inline(always)] fn d5(&self) -> Self { [<dext_chop_suey_ $t>](*self, 5)}
+            #[inline(always)] fn d6(&self) -> Self { [<dext_chop_suey_ $t>](*self, 6)}
+            #[inline(always)] fn d8(&self) -> Self { [<dext_chop_suey_ $t>](*self, 8)}
+            #[inline(always)] fn d10(&self) -> Self { [<dext_chop_suey_ $t>](*self, 10)}
+            #[inline(always)] fn d12(&self) -> Self { [<dext_chop_suey_ $t>](*self, 12)}
+            #[inline(always)] fn d20(&self) -> Self { [<dext_chop_suey_ $t>](*self, 20)}
+            #[inline(always)] fn d100(&self) -> Self { [<dext_chop_suey_ $t>](*self, 100)}
+        }
     }};
 }
 
-implement_diceext!(for
-    (i8, 64 bits),
-    (i16, 64 bits),
-    (i32, 64 bits),
-    (i64, 64 bits),
-    (i128, 128 bits),
-    (isize, 64 bits),
-    (u8, 64 bits),
-    (u16, 64 bits),
-    (u32, 64 bits),
-    (u64, 64 bits),
-    (u128, 128 bits),
-    (usize, 64 bits),
-);
 #[cfg(not(feature = "f128-stable"))]
-implement_float_diceext!(for f32, f64);//f128 still unstable: 13th Jul 2026
+implement_float_diceext!([f32, f64]);
 #[cfg(feature = "f128-stable")]
-implement_float_diceext!(for f32, f64, f128);
+implement_float_diceext!(f128);//f128 still unstable: 13th Jul 2026

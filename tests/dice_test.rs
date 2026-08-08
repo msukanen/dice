@@ -4,10 +4,26 @@ use dicebag::*;
 use nohash::BuildNoHashHasher;
 use serde::Deserialize;
 
+const SPAM_THRESHOLD_SMALL: usize = 10_000;
+const SPAM_THRESHOLD: usize = 100_001;// 100,001, because it's such a pretty number
+
+fn comma_sep(n: usize) -> String {
+    let s = n.to_string();
+    let bytes = s.as_bytes();
+    let mut res = String::new();
+    for (i,&b) in bytes.iter().rev().enumerate() {
+        if i > 0 && i % 3 == 0 {
+            res.push(',');
+        }
+        res.push(b as char);
+    }
+    res.chars().rev().collect()
+}
+
 /// See that D6 rolls stay within range.
 #[test]
 fn d6_stay_in_range() {
-    for _ in 0..10_000 {
+    for _ in 0..SPAM_THRESHOLD_SMALL {
         let d = 1.d6();
         assert!(d >= 1 && d <= 6, "d = {}", d);
     }
@@ -45,7 +61,7 @@ fn chance_macro_works() {
 #[test]
 fn random_of_vec() {
     let vs = vec![&1,&2,&3,&4,&5];
-    for _ in 0..10_000 {
+    for _ in 0..SPAM_THRESHOLD_SMALL {
         let v = vs.random_of();
         assert!(*v >= 1 && *v <= 5, "Hol' a moment! We got an out of bounds, wild {v} amongst us!");
     }
@@ -54,7 +70,7 @@ fn random_of_vec() {
 #[test]
 fn random_of_f64() {
     let vs = 0.5..=2.0;
-    for _ in 0..100_001 {
+    for _ in 0..SPAM_THRESHOLD {
         let v = vs.random_of();
         assert!(vs.contains(&v))
     }
@@ -79,7 +95,7 @@ fn dice_roll_modifiers() {
     let mut old_roll = 0;
     let mut repeats = 0;
     _ = env_logger::try_init();
-    for _ in 0..10_000 {
+    for _ in 0..SPAM_THRESHOLD_SMALL {
         let r = s.something.roll();
         // log::debug!("r = {r}");
         if old_roll == r {
@@ -96,14 +112,18 @@ fn dice_roll_modifiers() {
 fn chance_50perc() {
     let c = DiceRollMatrix::Chance(50, Box::new(DiceRollMatrix::Exact { value: 1 }));
     let mut ones = 0;
-    for _ in 0..10_000_000 {
+    const SPAM: usize = SPAM_THRESHOLD_SMALL * 1_000;
+    const FRAC: usize = SPAM / 1_000;
+    const LOW: usize = SPAM/2 - FRAC;
+    const HIGH: usize = LOW + FRAC * 2;
+    for _ in 0..SPAM {
         if c.roll() == 1 {
             ones += 1;
         }
     }
-    assert!(ones >= 4500000 && ones <= 5500000, "Strange number of ones: {ones}; expected 4.5–5.5 mid range");
+    assert!(ones >= LOW && ones <= HIGH, "Strange number of ones: {}; expected permille ±var from {}", comma_sep(ones), comma_sep(SPAM/2));
     _ = env_logger::try_init();
-    log::debug!("Exactly {ones} '1's out of 10,000,000 pool of 50% chances.")
+    log::debug!("Exactly {} '1's out of {} pool of 50% chances.", comma_sep(ones), comma_sep(SPAM));
 }
 
 #[test]
@@ -207,7 +227,7 @@ fn test_concurrent_clobbering() {
 }
 
 #[test]
-fn test_dicebag_is_completely_non_deterministic() {
+fn dicebag_is_completely_non_deterministic() {
     use std::{time::Duration, thread};
     
     _ = env_logger::try_init();
@@ -272,12 +292,49 @@ fn longest_streak_above_50() {
 #[test]
 fn appearance_of_1_to_100() {
     let mut app: HashMap<usize, usize, BuildNoHashHasher<usize>> = HashMap::default();
-    for _ in 0..1_000_000 {
+    for _ in 0..SPAM_THRESHOLD * 100 {
         let x = 1.d100();
         *app.entry(x).or_default() += 1;
     }
     _ = env_logger::try_init();
     for (k,c) in app {
         log::debug!("{k} → {c} times out of 1,000,000");
+    }
+}
+
+#[test]
+fn float_dice_bounds_f32() {
+    // Test standard integer float casting (e.g., 2.0 d6 should be between 2.0 and 12.0)
+    for _ in 0..SPAM_THRESHOLD {
+    let roll: f32 = 2.0.d6();
+    assert!(roll >= 2.0 && roll <= 12.0, "Roll out of bounds: {}", roll);
+
+    // Test pure fractional roll (e.g., 0.5 d10 should be between 0.0 and 5.0)
+    let fractional_roll: f32 = 0.5.d10();
+    assert!(fractional_roll >= 0.0 && fractional_roll <= 5.0, "Fractional roll out of bounds: {}", fractional_roll);
+
+    // Test mixed chop-suey roll (1.25 d10 -> max could be 10 + 2.5 = 12.5)
+    let chop_roll: f32 = 1.25.d10();
+    assert!(chop_roll >= 1.0 && chop_roll <= 12.5, "Chop-suey roll out of bounds: {}", chop_roll);
+    }
+}
+
+#[test]
+fn float_dice_bounds_f64() {
+    for _ in 0..SPAM_THRESHOLD {
+    let roll: f64 = 3.0.d20();
+    assert!(roll >= 3.0 && roll <= 60.0);
+
+    let sub_one: f64 = 0.75.d4();
+    assert!(sub_one >= 0.0 && sub_one <= 3.0);
+    }
+}
+
+#[test]
+fn float_zero_and_edge_cases() {
+    for _ in 0..SPAM_THRESHOLD {
+    // Rolling zero dice should yield zero
+    let zero_roll: f32 = 0.0.d100();
+    assert_eq!(zero_roll, 0.0);
     }
 }
