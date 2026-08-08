@@ -5,8 +5,7 @@ This library contains various "dice rolling" functions and traits.
 ## Primitives? Yes, please
 
 In most cases, anything from `i8`/`u8` up to `i128`/`u128`
-and `usize` is supported (alongside `f32`/`f64` for a few
-functions).
+and `usize` is supported alongside `f32`/`f64` (and future `f128`).
 
 ## dicebag::DiceExt
 
