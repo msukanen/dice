@@ -239,20 +239,28 @@ fn drm_roundtrip_nested_chance() {
 /// other dreadful issues …
 #[test]
 fn test_concurrent_clobbering() {
+    _ = env_logger::try_init();
     let mut handles = vec![];
+    const THREAD_COUNT: usize = 1_000;
+    const ROLLS_PER_THREAD: usize = 100_000;
+    const HUNTER: u64 = u64::MAX - 12345;
     
-    for _ in 0..100 {
+    for _ in 0..THREAD_COUNT {
         handles.push(thread::spawn(|| {
-            for _ in 0..10_000 {
-                let roll = 1_i64.d(100);
-                assert!(roll >= 1 && roll <= 100);
+            for _ in 0..ROLLS_PER_THREAD {
+                let roll = 1_u64.d(HUNTER as usize);
+                assert!(roll >= 1 && roll <= HUNTER);
             }
         }));
     }
 
+    let mut c = 0;
     for handle in handles {
         handle.join().unwrap();
+        c += 1;
     }
+    assert_eq!(THREAD_COUNT, c);
+    log::debug!("All {THREAD_COUNT} threads accounted for. Phew…");
 }
 
 #[test]

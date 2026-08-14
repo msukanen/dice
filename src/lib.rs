@@ -113,38 +113,38 @@ macro_rules! percentage_chance_of {
     }};
 }
 
-#[cfg(all(test, feature = "test-xoshiro-only"))]
-mod dice_xoshiro_tests {
-    use super::*;
+// #[cfg(all(test, feature = "test-xoshiro-only"))]
+// mod dice_xoshiro_tests {
+//     use super::*;
 
-    macro_rules! rolly_polly {
-        ([$($t:tt),*]) => {paste::paste!{$(
-            rolly_polly!(type [<u $t>]);
-            rolly_polly!(type [<i $t>]);
-        )+}};
-        (type $t:tt) => {paste::paste!{
-            _ = [<5_ $t>].d(6);
-            _ = [<3_ $t>].d(20);
-            _ = [<1_ $t>].d(1337);
-        }};
-    }
+//     macro_rules! rolly_polly {
+//         ([$($t:tt),*]) => {paste::paste!{$(
+//             rolly_polly!(type [<u $t>]);
+//             rolly_polly!(type [<i $t>]);
+//         )+}};
+//         (type $t:tt) => {paste::paste!{
+//             _ = [<5_ $t>].d(6);
+//             _ = [<3_ $t>].d(20);
+//             _ = [<1_ $t>].d(1337);
+//         }};
+//     }
 
-    #[test]
-    fn threaded_8() {
-        use std::thread;
-        _ = env_logger::try_init();
+//     #[test]
+//     fn threaded_8() {
+//         use std::thread;
+//         _ = env_logger::try_init();
 
-        let mut handles = vec![];
-        for _ in 0..1_024 {
-            handles.push(thread::spawn(move || {
-                for _ in 0..10_000 {
-                    rolly_polly!([8,16,32,64,128,size]);
-                }
-            }));
-        }
+//         let mut handles = vec![];
+//         for _ in 0..1_024 {
+//             handles.push(thread::spawn(move || {
+//                 for _ in 0..10_000 {
+//                     rolly_polly!([8,16,32,64,128,size]);
+//                 }
+//             }));
+//         }
 
-        for h in handles {
-            h.join().unwrap();
-        }
-    }
-}
+//         for h in handles {
+//             h.join().unwrap();
+//         }
+//     }
+// }

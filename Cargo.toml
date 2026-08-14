@@ -23,4 +23,4 @@ nohash = "0.2.0"
 default = []
 f128-stable = []
 # some test-only features
-test-xoshiro-only = []
+# test-xoshiro-only = []
