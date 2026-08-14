@@ -339,6 +339,7 @@ fn appearance_of_1_to_100() {
     }
 }
 
+#[cfg(feature = "experimental")]
 #[test]
 fn float_dice_bounds_f32() {
     // Test standard integer float casting (e.g., 2.0 d6 should be between 2.0 and 12.0)
@@ -356,6 +357,7 @@ fn float_dice_bounds_f32() {
     }
 }
 
+#[cfg(feature = "experimental")]
 #[test]
 fn float_dice_bounds_f64() {
     for _ in 0..SPAM_THRESHOLD {
@@ -367,6 +369,7 @@ fn float_dice_bounds_f64() {
     }
 }
 
+#[cfg(feature = "experimental")]
 #[test]
 fn float_zero_and_edge_cases() {
     for _ in 0..SPAM_THRESHOLD {

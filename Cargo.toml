@@ -1,6 +1,6 @@
 [package]
 name = "dicebag"
-version = "0.3.33"
+version = "0.3.34"
 edition = "2024"
 description = "Chaotic dice rolling!"
 license = "MIT OR Apache-2.0"
@@ -22,5 +22,6 @@ nohash = "0.2.0"
 [features]
 default = []
 f128-stable = []
+experimental = []
 # some test-only features
 # test-xoshiro-only = []

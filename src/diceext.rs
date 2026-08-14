@@ -67,6 +67,7 @@ macro_rules! impl_dice_notation {
 }
 impl_dice_notation!([8,16,32,64,128,size]);
 
+#[cfg(feature = "experimental")]
 /// Implement some dice extensions for float types.
 macro_rules! implement_float_diceext {
     ([$($t:ty),*]) => { $( implement_float_diceext!($t); )+ };
@@ -109,7 +110,9 @@ macro_rules! implement_float_diceext {
     }};
 }
 
+#[cfg(feature = "experimental")]
 #[cfg(not(feature = "f128-stable"))]
 implement_float_diceext!([f32, f64]);
+#[cfg(feature = "experimental")]
 #[cfg(feature = "f128-stable")]
 implement_float_diceext!(f128);//f128 still unstable: 13th Jul 2026
