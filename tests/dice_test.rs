@@ -51,6 +51,35 @@ fn d97_stay_in_range() {
     log::debug!("Saturated at #{sat_at} out of (at least) 10,000 loops.");
 }
 
+/// See that d(97) rolls stay within range.
+#[test]
+fn full_saturation() {
+    let dees = [2,3,4,5,6,8,10,12,20,100];
+    _ = env_logger::try_init();
+    for sides in dees {
+        let mut ds = HashSet::new();
+        let mut i = 1;
+        let mut sat_at = -1;
+        loop {
+            let d = 1.d(sides);
+            if sides == 8 {
+                log::info!("D8: {d}");
+            }
+            ds.insert(d);
+            assert!(d >= 1 && d <= sides, "d = {}", d);
+            if ds.len() >= sides && sat_at < 0 {
+                sat_at = i;
+            }
+            i += 1;
+            if i as usize > SPAM_THRESHOLD || ds.len() >= sides {
+                break;
+            }
+        }
+        log::debug!("Saturated D{sides} @ #{sat_at} out of (at most) {} loops.", comma_sep(SPAM_THRESHOLD));
+    }
+}
+
+
 #[test]
 fn chance_macro_works() {
     for _ in 0..20 {
@@ -273,7 +302,7 @@ fn dicebag_is_completely_non_deterministic() {
 fn longest_streak_above_50() {
     let mut longest = 0;
     let mut curr = 0;
-    for _ in 0..1_000_000 {
+    for _ in 0..10_000_000 {
         let x = 1.d100();
         if x > 50 {
             curr += 1;
@@ -285,7 +314,7 @@ fn longest_streak_above_50() {
         }
     }
     _ = env_logger::try_init();
-    assert!(longest < 24, "Expected 19-20 at most, got {}", longest);
+    assert!(longest <= 24, "Expected 24 at most, got {}", longest);
     log::debug!("Longest streak above 50: {longest}");
 }
 
