@@ -682,10 +682,10 @@ mod engine {
                             .wrapping_add([<CE_CRNG_U $bits _ADD>])
                             ^ (max as [<u $bits>])
                             ^ stack_entropy
-                            // ^ {
-                            //     let inst = std::time::Instant::now();
-                            //     &inst as *const _ as usize as [<u $bits>]
-                            // }
+                            ^ {
+                                let inst = std::time::Instant::now();
+                                &inst as *const _ as usize as [<u $bits>]
+                            }
                             ;
                         *ptr = next as $t;
                         ((next % (max as [<u $bits>])) + 1) as $t

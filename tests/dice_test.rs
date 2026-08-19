@@ -378,3 +378,9 @@ fn float_zero_and_edge_cases() {
     assert_eq!(zero_roll, 0.0);
     }
 }
+
+#[test]
+fn hilo() {
+    _ = hi!();
+    _ = lo!();
+}
