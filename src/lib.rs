@@ -3,7 +3,7 @@ use std::{cell::UnsafeCell, sync::OnceLock};
 
 mod diceext; pub use diceext::*;
 mod dicermatrix; pub use dicermatrix::*;
-mod incl_rr; pub use incl_rr::*;
+mod randomrange; pub use randomrange::*;
 mod is_one; pub use is_one::*;
 mod randomof; pub use randomof::*;
 mod variance; pub use variance::*;
@@ -18,7 +18,7 @@ unsafe impl Send for ChaoticDice {}
 unsafe impl Sync for ChaoticDice {}
 
 impl ChaoticDice {
-    pub(crate) fn new(seed: u64) -> Self {
+    fn new(seed: u64) -> Self {
         let mut shards = Vec::with_capacity(SHARD_COUNT);
         for i in 0..SHARD_COUNT {
             shards.push(UnsafeCell::new(Xoshiro512Plus::seed_from_u64(
@@ -34,7 +34,6 @@ impl ChaoticDice {
     pub(crate) fn roll_one(&self, sides: u64) -> u64 {
         debug_assert!(sides >= 1, "Dice must have at least 1 side");
         let idx = fast_shard_index();
-        // (unsafe { &mut *self.shards[idx].get() }.next_u64() % sides) + 1
         let rng = unsafe { &mut *self.shards[idx].get() };
         let x = rng.next_u64();
         let mut m = (x as u128) * (sides as u128);
@@ -52,6 +51,10 @@ impl ChaoticDice {
     #[inline(always)]
     pub(crate) fn roll64(&self, count: u64, sides: u64) -> u64 {
         (0..count).map(|_| self.roll_one(sides)).sum()
+    }
+
+    pub(crate) fn rng(&self) -> &mut Xoshiro512Plus {
+        unsafe { &mut *self.shards[fast_shard_index()].get() }
     }
 }
 
@@ -115,3 +118,13 @@ macro_rules! percentage_chance_of {
 
 #[macro_export] macro_rules! hi { () => {{ use dicebag::DiceExt; 1_u8.d2() == 2 }}; }
 #[macro_export] macro_rules! lo { () => {{ use dicebag::DiceExt; 1_u8.d2() == 1 }}; }
+
+trait Rng128Ext: Rng {
+    fn next_u128(&mut self) -> u128 {
+        let hi = self.next_u64() as u128;
+        let lo = self.next_u64() as u128;
+        (hi << 64) | lo
+    }
+}
+
+impl<R: Rng> Rng128Ext for R {}
