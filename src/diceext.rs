@@ -61,7 +61,10 @@ macro_rules! impl_dice_notation {
             #[inline(always)] fn d10(&self) -> Self { self.d(10) }
             #[inline(always)] fn d12(&self) -> Self { self.d(12) }
             #[inline(always)] fn d20(&self) -> Self { self.d(20) }
+            #[cfg(not(feature = "d100-00-to-99"))]
             #[inline(always)] fn d100(&self) -> Self { self.d(100) }
+            #[cfg(feature = "d100-00-to-99")]
+            #[inline(always)] fn d100(&self) -> Self { self.d(100) - 1 }
         }
     };
 }
